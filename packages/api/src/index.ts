@@ -352,7 +352,7 @@ app.use(
 app.use(express.json());
 
 // Middleware to check if user is authenticated
-const isAuthenticated = (req: Request, res: Response, next: NextFunction) => {
+const isAuthenticated = (req: any, res: any, next: NextFunction) => {
   if (req.isAuthenticated()) {
     return next();
   }
@@ -545,12 +545,10 @@ app.get(
             `Spotify API error for playlist name ${playlistId}: ${response.status}`,
             errorBody,
           );
-          return res
-            .status(response.status)
-            .json({
-              message: "Failed to fetch playlist name from Spotify.",
-              details: errorBody,
-            });
+          return res.status(response.status).json({
+            message: "Failed to fetch playlist name from Spotify.",
+            details: errorBody,
+          });
         }
         const data = (await response.json()) as { name: string };
         res.json({ name: data.name });
@@ -569,11 +567,9 @@ app.get(
       const { playlistId } = req.params;
       const token = await getValidSpotifyToken(); // Use server-side token
       if (!token) {
-        return res
-          .status(503)
-          .json({
-            message: "Could not retrieve Spotify API token for server.",
-          });
+        return res.status(503).json({
+          message: "Could not retrieve Spotify API token for server.",
+        });
       }
       try {
         // You can adjust 'fields' to get more or less data about tracks
@@ -601,19 +597,15 @@ app.get(
             );
             // Check for specific 404 for playlist not found
             if (response.status === 404) {
-              return res
-                .status(404)
-                .json({
-                  message: `Playlist with ID ${playlistId} not found on Spotify.`,
-                  details: errorBody,
-                });
-            }
-            return res
-              .status(response.status)
-              .json({
-                message: "Failed to fetch playlist tracks from Spotify.",
+              return res.status(404).json({
+                message: `Playlist with ID ${playlistId} not found on Spotify.`,
                 details: errorBody,
               });
+            }
+            return res.status(response.status).json({
+              message: "Failed to fetch playlist tracks from Spotify.",
+              details: errorBody,
+            });
           }
 
           const pageData = (await response.json()) as {
@@ -694,24 +686,22 @@ app.post(
     const { name, spotify_playlist_id, description, latitude, longitude } =
       req.body;
     if (!name || !spotify_playlist_id) {
-      return res
-        .status(400)
-        .json({
-          message: "Missing required fields: name and spotify_playlist_id",
-        });
+      return res.status(400).json({
+        message: "Missing required fields: name and spotify_playlist_id",
+      });
     }
-    if (!latitude || !longitude) {
-      return res
-        .status(400)
-        .json({ message: "Missing required fields: latitude and longitude" });
-    }
+    // if (!latitude || !longitude) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "Missing required fields: latitude and longitude" });
+    // }
     try {
       const [newPlaylistId] = await db("playlists").insert({
         name,
         spotify_playlist_id,
         description,
-        latitude,
-        longitude,
+        // latitude,
+        // longitude,
       });
       const newPlaylist = await db("playlists")
         .where({ id: newPlaylistId })
@@ -803,12 +793,10 @@ app.post(
       timestamp_ms === undefined ||
       !comment_text
     ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Missing required fields: playlist_id, track_uri, timestamp_ms, comment_text.",
-        });
+      return res.status(400).json({
+        message:
+          "Missing required fields: playlist_id, track_uri, timestamp_ms, comment_text.",
+      });
     }
 
     // Optional: Validate that the playlist exists
@@ -875,12 +863,10 @@ app.put(
 
       if (!userSpotifyToken) {
         // If token refresh failed or no initial token, user might need to re-authenticate fully.
-        return res
-          .status(401)
-          .json({
-            message:
-              "Spotify access token missing or failed to refresh. Please re-login.",
-          });
+        return res.status(401).json({
+          message:
+            "Spotify access token missing or failed to refresh. Please re-login.",
+        });
       }
 
       const { device_id, context_uri, uris, offset, position_ms } = req.body;
@@ -908,12 +894,10 @@ app.put(
       } else {
         // This case should ideally be caught by the frontend or earlier validation,
         // but as a fallback, Spotify will also return an error.
-        return res
-          .status(400)
-          .json({
-            message:
-              "Either context_uri or uris must be provided to start playback.",
-          });
+        return res.status(400).json({
+          message:
+            "Either context_uri or uris must be provided to start playback.",
+        });
       }
 
       const spotifyApiUrl = `https://api.spotify.com/v1/me/player/play?device_id=${device_id}`;
@@ -1011,12 +995,10 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
   console.error(err.stack);
   if (err.message.includes("Failed to fetch playlists")) {
     // Example of specific error handling
-    res
-      .status(503)
-      .json({
-        message: "Service temporarily unavailable: Could not fetch playlists.",
-        error: err.message,
-      });
+    res.status(503).json({
+      message: "Service temporarily unavailable: Could not fetch playlists.",
+      error: err.message,
+    });
   } else {
     res
       .status(500)

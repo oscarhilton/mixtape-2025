@@ -3,7 +3,7 @@
 import React from "react";
 import { useSpotifyPlayer } from "@repo/shared-contexts";
 import { useAuth } from "@repo/shared-contexts";
-import { VoteButton } from '@repo/shared-ui'; // Temporarily commented out
+import { VoteButton } from "@repo/shared-ui"; // Temporarily commented out
 
 interface Playlist {
   id: number;
@@ -57,7 +57,9 @@ export const PlaylistEntry: React.FC<PlaylistEntryProps> = ({
 
   return (
     <li className="bg-spotify-light-dark dark:bg-spotify-light-dark rounded-lg shadow-xl p-4 flex flex-col gap-3 hover:bg-spotify-gray transition-colors duration-150">
-      <h3 className="text-base font-bold mb-0.5 truncate text-spotify-light-gray">{playlist.name}</h3>
+      <h3 className="text-base font-bold mb-0.5 truncate text-spotify-light-gray">
+        {playlist.name}
+      </h3>
       {playlist.description && (
         <p className="text-spotify-light-gray text-xs mb-1 line-clamp-2">
           {playlist.description}

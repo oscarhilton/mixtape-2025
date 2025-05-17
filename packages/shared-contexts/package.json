@@ -11,9 +11,13 @@
     "react": "^18"
   },
   "devDependencies": {
+    "@eslint/js": "^8.57.1",
+    "@types/react": "^18",
+    "eslint": "^8.57.1",
+    "eslint-plugin-react": "^7.37.5",
+    "globals": "^16.1.0",
     "react": "^18",
     "typescript": "^5.0.0",
-    "@types/react": "^18",
-    "eslint": "^8"
+    "typescript-eslint": "^8.32.1"
   }
-} 
+}

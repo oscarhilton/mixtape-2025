@@ -300,7 +300,9 @@ export const PlaylistContent: React.FC<PlaylistContentProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8 p-6 w-full">
         {/* Left Column: Playlist Entries */}
         <div className="md:col-span-3 space-y-6">
-          <h2 className="text-spotify-light-gray text-2xl font-semibold mb-4">Playlists</h2>
+          <h2 className="text-spotify-light-gray text-2xl font-semibold mb-4">
+            Playlists
+          </h2>
           {playlists.length > 0 ? (
             <ul className="space-y-4">
               {playlists.map((playlist) => (
@@ -348,7 +350,7 @@ export const PlaylistContent: React.FC<PlaylistContentProps> = ({
                         alt={track.album.name}
                         className="w-10 h-10 rounded-md object-cover"
                         width={40}
-                        height={40} 
+                        height={40}
                       />
                     ) : (
                       <div className="w-10 h-10 rounded bg-spotify-gray flex items-center justify-center">
@@ -408,7 +410,7 @@ export const PlaylistContent: React.FC<PlaylistContentProps> = ({
         </div>
       </div>
       <div className="bg-spotify-light-dark p-4 rounded-lg">
-        <PlaybackControls currentPlaylistId={currentDbPlaylistId} />
+        <PlaybackControls />
       </div>
     </div>
   );

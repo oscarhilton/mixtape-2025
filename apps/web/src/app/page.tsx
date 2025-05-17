@@ -1,11 +1,6 @@
-// import { PlaybackControls } from "@/components/PlaybackControls"; // Moved to PlaylistContent
-// import { TrackCommentsDisplay } from "@/components/TrackCommentsDisplay"; // Moved to PlaylistContent
 import { PlaylistContent } from "@/components/PlaylistContent";
-// import { AddPlaylistModal } from "@/components/AddPlaylistModal"; // Commented out for now
-// import { PlaylistGrid } from "@/components/PlaylistGrid"; // Commented out for now
-import { PlaybackControls } from "@/components/PlaybackControls"; // Assuming this will be moved later
-// import { VoteButton } from "shared-ui"; // Updated import for VoteButton
-import { logger, API_URL, ErrorBoundary } from "@repo/shared-ui";
+import { logger, API_URL, ErrorBoundary, PlaylistForm } from "@repo/shared-ui";
+import SpotifyRecorderControl from "../components/SpotifyRecorderControl";
 
 // Removed client-side hooks: useAuth, useSpotifyPlayer, useEffect, useState
 
@@ -92,11 +87,14 @@ export default async function Home() {
   return (
     <ErrorBoundary>
       <main className="min-h-screen bg-spotify-dark font-sans w-full mx-auto px-4">
+        <SpotifyRecorderControl />
+        {/* <PlaylistForm /> */}
         <PlaylistContent
           initialPlaylists={playlists}
           initialComments={initialComments}
           initialCurrentPlaylistId={initialCurrentPlaylistId}
         />
+        <span>foo</span>
       </main>
     </ErrorBoundary>
   );

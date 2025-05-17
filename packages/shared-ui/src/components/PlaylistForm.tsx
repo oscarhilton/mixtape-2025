@@ -4,6 +4,7 @@ import { useState, FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@repo/shared-contexts";
 import { LocationInput } from "./LocationInput";
+import MixtapeSticker from "./MixtapeSticker";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
@@ -105,10 +106,10 @@ export default function PlaylistForm() {
       return;
     }
 
-    if (!location.latitude || !location.longitude) {
-      setError("Please select a location for your playlist.");
-      return;
-    }
+    // if (!location.latitude || !location.longitude) {
+    //   setError("Please select a location for your playlist.");
+    //   return;
+    // }
 
     setIsSubmitting(true);
     try {
@@ -121,8 +122,8 @@ export default function PlaylistForm() {
           name,
           spotify_playlist_id: extractedId,
           description,
-          latitude: location.latitude,
-          longitude: location.longitude,
+          // latitude: location.latitude || 0,
+          // longitude: location.longitude || 0,
         }),
       });
       if (!response.ok) {
@@ -150,21 +151,26 @@ export default function PlaylistForm() {
 
   if (!user) {
     return (
-      <section className="mb-8 p-6 bg-white shadow-md rounded-lg text-center">
+      <section className="mb-8 p-6 bg-spotify-light-dark shadow-md rounded-lg text-center">
         <h2 className="text-2xl font-semibold mb-4">Add New Playlist</h2>
-        <p className="text-gray-600">Please log in to add a new playlist.</p>
+        <p className="text-spotify-light-gray">
+          Please log in to add a new playlist.
+        </p>
       </section>
     );
   }
 
   return (
-    <section className="mb-8 p-6 bg-white shadow-md rounded-lg">
-      <h2 className="text-2xl font-semibold mb-4">Add New Playlist</h2>
+    <section className="mb-8 p-6 bg-spotify-light-dark shadow-md rounded-lg">
+      <h2 className="text-spotify-light-gray text-2xl font-semibold mb-4">
+        Add New Playlist
+      </h2>
+      <MixtapeSticker />
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label
             htmlFor="spotifyPlaylistUrl"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-spotify-light-gray"
           >
             Spotify Playlist URL:
           </label>
@@ -175,13 +181,13 @@ export default function PlaylistForm() {
             onChange={(e) => handleUrlChange(e.target.value)}
             required
             disabled={isSubmitting}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50"
+            className="mt-1 block w-full px-3 py-2 border border-spotify-gray rounded-md shadow-sm focus:outline-none focus:ring-spotify-green focus:border-spotify-green sm:text-sm disabled:bg-gray-50 text-spotify-light-gray p-4"
           />
         </div>
         <div>
           <label
             htmlFor="description"
-            className="block text-sm font-medium text-gray-700"
+            className="block text-sm font-medium text-spotify-light-gray"
           >
             Description (Optional):
           </label>
@@ -191,19 +197,21 @@ export default function PlaylistForm() {
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             disabled={isSubmitting}
-            className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50"
+            className="mt-1 block w-full px-3 py-2 border border-spotify-gray rounded-md shadow-sm focus:outline-none focus:ring-spotify-green focus:border-spotify-green sm:text-sm disabled:bg-gray-50 text-spotify-light-gray p-4"
           />
         </div>
 
-        <div className="mt-6">
-          <h3 className="text-lg font-medium text-gray-700 mb-4">Location</h3>
+        {/* <div className="mt-6">
+          <h3 className="text-lg font-medium text-spotify-light-gray mb-4">
+            Location
+          </h3>
           <LocationInput onLocationChange={setLocation} />
-        </div>
+        </div> */}
 
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium bg-spotify-green hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-spotify-green disabled:bg-indigo-300"
         >
           {isSubmitting ? "Submitting..." : "Add Playlist"}
         </button>

@@ -25,7 +25,9 @@ export default function Header() {
               <p className="italic text-spotify-light-gray">Loading user...</p>
             ) : user ? (
               <div className="flex items-center space-x-4">
-                <span className="text-spotify-light-gray">{user.display_name}</span>
+                <span className="text-spotify-light-gray">
+                  {user.display_name}
+                </span>
                 <button
                   onClick={logout}
                   className="px-4 py-2 text-sm font-medium bg-spotify-green rounded-full hover:bg-opacity-90 transition-colors"

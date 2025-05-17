@@ -1,7 +1,6 @@
 "use client";
 
 import { useSpotifyPlayer } from "@repo/shared-contexts";
-import { CommentInput } from "./CommentInput";
 import React from "react";
 import {
   PlayIcon,
@@ -10,11 +9,8 @@ import {
   BackwardIcon, // Placeholder for Previous Track
 } from "@heroicons/react/24/solid"; // Example using Heroicons
 import Image from "next/image";
-interface PlaybackControlsProps {
-  currentPlaylistId: number | null;
-}
 
-export function PlaybackControls({ currentPlaylistId }: PlaybackControlsProps) {
+export function PlaybackControls() {
   const {
     player, // Direct access to player for nextTrack, prevTrack, seek, setVolume
     isReady: playerIsReady,
