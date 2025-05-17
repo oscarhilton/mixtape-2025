@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useAuth } from '@repo/shared-contexts';
 import Link from 'next/link';
 
@@ -7,41 +8,42 @@ export default function Header() {
   const { user, isLoading, login, logout, devLogin } = useAuth();
 
   return (
-    <header className="bg-gray-800 text-white p-4 shadow-md">
+    <header className="bg-spotify-light-dark text-spotify-light-gray p-4 sticky top-0 z-50 shadow-lg">
       <div className="container mx-auto flex justify-between items-center">
-        <Link href="/" className="text-xl font-bold hover:text-gray-300">
+        <Link href="/" className="text-2xl font-bold hover:text-white transition-colors">
           Mixtape In A Bottle
         </Link>
-        <nav>
+        <nav className="flex items-center space-x-4">
           {isLoading ? (
-            <p>Loading...</p>
+            <p className="italic">Loading user...</p>
           ) : user ? (
-            <div className="flex items-center space-x-4">
-              <p>Welcome, {user.display_name}!</p>
+            <>
+              <span className="text-sm">Welcome, {user.display_name}!</span>
               <button
                 onClick={logout}
-                className="px-4 py-2 bg-red-500 hover:bg-red-700 rounded transition-colors"
+                className="px-4 py-2 bg-spotify-gray hover:bg-red-700 text-white rounded-md transition-colors text-sm font-medium"
               >
                 Logout
               </button>
-            </div>
+            </>
           ) : (
-            <div className="flex items-center space-x-2">
+            <>
               <button
                 onClick={login}
-                className="px-4 py-2 bg-green-500 hover:bg-green-700 rounded transition-colors"
+                className="px-4 py-2 bg-spotify-green hover:bg-opacity-80 text-white rounded-md transition-colors text-sm font-medium"
               >
                 Login with Spotify
               </button>
               {process.env.NODE_ENV === 'development' && devLogin && (
                 <button
-                  onClick={() => devLogin('your_dev_user_id')} // Replace 'your_dev_user_id' with your actual dev user ID
-                  className="px-4 py-2 bg-purple-500 hover:bg-purple-700 rounded transition-colors"
+                  onClick={() => devLogin('1')} // Default dev user ID to '1' or make it configurable
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-md transition-colors text-sm font-medium"
+                  title="Ensure your backend supports dev login with this ID"
                 >
                   Dev Login
                 </button>
               )}
-            </div>
+            </>
           )}
         </nav>
       </div>

@@ -26,12 +26,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-      <body>
+    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}>
+      <body className="h-full bg-spotify-dark text-spotify-light-gray">
         <AuthProvider>
           <SpotifyPlayerProvider>
-            <Header />
-            {children}
+            <div className="flex flex-col h-full">
+              <Header />
+              <main className="flex-grow overflow-y-auto">
+                {children}
+              </main>
+            </div>
           </SpotifyPlayerProvider>
         </AuthProvider>
       </body>

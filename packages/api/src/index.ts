@@ -473,13 +473,27 @@ app.get('/playlists', asyncHandler(async (req: Request, res: Response) => {
 
 // Create a new playlist
 app.post('/playlists', asyncHandler(async (req: Request, res: Response) => {
-  const { name, spotify_playlist_id, description } = req.body;
+  const { name, spotify_playlist_id, description, latitude, longitude } = req.body;
   if (!name || !spotify_playlist_id) {
     return res.status(400).json({ message: "Missing required fields: name and spotify_playlist_id" });
   }
-  const [newPlaylistId] = await db('playlists').insert({ name, spotify_playlist_id, description });
-  const newPlaylist = await db('playlists').where({ id: newPlaylistId }).first();
-  res.status(201).json(newPlaylist);
+  if (!latitude || !longitude) {
+    return res.status(400).json({ message: "Missing required fields: latitude and longitude" });
+  }
+  try {
+    const [newPlaylistId] = await db('playlists').insert({ 
+      name, 
+      spotify_playlist_id, 
+      description,
+      latitude,
+      longitude
+    });
+    const newPlaylist = await db('playlists').where({ id: newPlaylistId }).first();
+    res.status(201).json(newPlaylist);
+  } catch (error: unknown) {
+    console.error('Error creating playlist:', error);
+    res.status(500).json({ message: "Failed to create playlist" });
+  }
 }));
 
 // Get a single playlist by ID
@@ -693,6 +707,18 @@ app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
     res.status(503).json({ message: "Service temporarily unavailable: Could not fetch playlists.", error: err.message });
   } else {
     res.status(500).json({ message: "Something went wrong!", error: err.message });
+  }
+});
+
+// Cool feature: Get top tracks from user's saved playlists
+app.get('/top-tracks', async (req, res) => {
+  try {
+    const response = await fetch(`https://api.spotify.com/v1/me/top/tracks`, {
+      headers: { Authorization: `Bearer ${req.headers.authorization}` },
+    });
+    res.json(await response.json());
+  } catch (error) {
+    res.status(500).send(error.message);
   }
 });
 

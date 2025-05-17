@@ -5,6 +5,7 @@ import { useAuth } from '@repo/shared-contexts';
 import { useSpotifyPlayer } from '@repo/shared-contexts';
 import { useRouter } from 'next/navigation';
 import { Button } from "@repo/shared-ui";
+import { logger } from '@repo/shared-ui';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -51,7 +52,7 @@ export function CommentInput({ playlistId }: CommentInputProps) {
       setError('Could not determine current track timestamp. Position is null.');
       return;
     }
-    console.log('[CommentInput] Current position from ref before submit:', currentPosition);
+    logger.log('[CommentInput] Current position from ref before submit:', currentPosition);
 
     if (!commentText.trim()) {
       setError('Comment cannot be empty.');
@@ -104,26 +105,49 @@ export function CommentInput({ playlistId }: CommentInputProps) {
   }
 
   return (
-    <div style={{ marginTop: '20px', padding: '15px', border: '1px solid #ccc', borderRadius: '8px' }}>
-      <h4>Add Comment at {displayPosition !== null ? `${Math.floor(displayPosition / 1000)}s` : 'current time'} for "{currentTrack.name}"</h4>
-      <form onSubmit={handleSubmitComment}>
-        <textarea
-          value={commentText}
-          onChange={(e) => setCommentText(e.target.value)}
-          placeholder="Write your comment..."
-          rows={3}
-          style={{ width: '100%', marginBottom: '10px', padding: '8px', borderRadius: '4px', border: '1px solid #ddd' }}
-          disabled={isSubmitting || !playlistId}
-        />
-        <button 
-          type="submit" 
-          disabled={isSubmitting || !playlistId || !commentText.trim() || positionRef.current === null} // Check ref for disabling
-          style={{ padding: '10px 15px', borderRadius: '4px', background: '#1DB954', color: 'white', border: 'none', cursor: 'pointer' }}
-        >
-          {isSubmitting ? 'Adding...' : 'Add Comment'}
-        </button>
-        {error && <p style={{ color: 'red', marginTop: '10px' }}>Error: {error}</p>}
-        {successMessage && <p style={{ color: 'green', marginTop: '10px' }}>{successMessage}</p>}
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h4 className="text-white text-sm font-medium">
+          Add comment at {displayPosition !== null ? `${Math.floor(displayPosition / 1000)}s` : 'current time'}
+        </h4>
+        <p className="text-spotify-light-gray text-sm">
+          {currentTrack.name}
+        </p>
+      </div>
+      
+      <form onSubmit={handleSubmitComment} className="space-y-4">
+        <div className="relative">
+          <textarea
+            value={commentText}
+            onChange={(e) => setCommentText(e.target.value)}
+            placeholder="Write your comment..."
+            rows={3}
+            className={`w-full bg-spotify-dark border rounded-md p-3 text-white placeholder-spotify-light-gray
+              focus:outline-none focus:ring-2 focus:ring-spotify-green
+              ${isSubmitting || !playlistId ? 'opacity-50 cursor-not-allowed' : ''}
+              ${error ? 'border-red-500' : 'border-spotify-gray'}`}
+            disabled={isSubmitting || !playlistId}
+          />
+          {error && (
+            <p className="absolute -bottom-6 left-0 text-red-500 text-sm">{error}</p>
+          )}
+          {successMessage && (
+            <p className="absolute -bottom-6 left-0 text-spotify-green text-sm">{successMessage}</p>
+          )}
+        </div>
+        
+        <div className="flex justify-end">
+          <button 
+            type="submit" 
+            disabled={isSubmitting || !playlistId || !commentText.trim() || positionRef.current === null}
+            className={`px-6 py-2 rounded-full font-medium transition-all
+              ${isSubmitting || !playlistId || !commentText.trim() || positionRef.current === null
+                ? 'bg-spotify-gray text-spotify-light-gray cursor-not-allowed'
+                : 'bg-spotify-green text-black hover:scale-105'}`}
+          >
+            {isSubmitting ? 'Adding...' : 'Add Comment'}
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -1,86 +1,172 @@
-# Turborepo starter
+# Music Sharing Platform
 
-This Turborepo starter is maintained by the Turborepo core team.
+A modern web application that allows users to share and discover playlists with location-based features. Built with Next.js, TypeScript, and Spotify integration.
 
-## Using this example
+## Features
 
-Run the following command:
+- **Spotify Integration**
+  - Seamless authentication with Spotify
+  - Playlist creation and management
+  - Real-time playback controls
+  - Track comments and discussions
 
-```sh
-npx create-turbo@latest
+- **Location-Based Features**
+  - Automatic location detection
+  - Manual address entry
+  - Geocoding support via Nominatim
+  - Playlist placement on map
+
+- **Social Features**
+  - Playlist voting system
+  - Track-specific comments
+  - User profiles and authentication
+  - Real-time updates
+
+## Tech Stack
+
+- **Frontend**
+  - Next.js 14
+  - TypeScript
+  - Tailwind CSS
+  - Heroicons
+  - React Context for state management
+
+- **Backend**
+  - Express.js
+  - Knex.js for database operations
+  - PostgreSQL database
+  - Passport.js for authentication
+
+- **Development Tools**
+  - Turborepo for monorepo management
+  - ESLint for code linting
+  - Prettier for code formatting
+  - TypeScript for type safety
+
+## Project Structure
+
+```
+├── apps/
+│   ├── web/           # Main Next.js application
+│   └── docs/          # Documentation site
+├── packages/
+│   ├── api/           # Express.js backend
+│   ├── shared-ui/     # Shared React components
+│   ├── shared-contexts/# Shared React contexts
+│   └── eslint-config/ # Shared ESLint configuration
 ```
 
-## What's inside?
+## Getting Started
 
-This Turborepo includes the following packages/apps:
+### Prerequisites
 
-### Apps and Packages
+- Node.js 18 or later
+- pnpm package manager
+- PostgreSQL database
+- Spotify Developer account
 
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
+### Environment Setup
 
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
+1. Create a `.env` file in the root directory with the following variables:
+```env
+# Spotify API
+SPOTIFY_CLIENT_ID=your_client_id
+SPOTIFY_CLIENT_SECRET=your_client_secret
 
-### Utilities
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/dbname
 
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-```
-cd my-turborepo
-pnpm build
+# API
+API_PORT=3001
+SESSION_SECRET=your_session_secret
 ```
 
-### Develop
-
-To develop all apps and packages, run the following command:
-
+2. Install dependencies:
+```bash
+pnpm install
 ```
-cd my-turborepo
+
+3. Run database migrations:
+```bash
+cd packages/api
+pnpm migrate:latest
+```
+
+4. Start the development servers:
+```bash
 pnpm dev
 ```
 
-### Remote Caching
+The application will be available at:
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:3001
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
+## Development
 
-Turborepo can use a technique known as [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
+### Available Scripts
 
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
+- `pnpm dev` - Start all applications in development mode
+- `pnpm build` - Build all applications and packages
+- `pnpm lint` - Run ESLint across all packages
+- `pnpm test` - Run tests across all packages
 
+### Database Migrations
+
+To create a new migration:
+```bash
+cd packages/api
+pnpm migrate:make migration_name
 ```
-cd my-turborepo
-npx turbo login
+
+To run migrations:
+```bash
+pnpm migrate:latest
 ```
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-```
-npx turbo link
+To rollback migrations:
+```bash
+pnpm migrate:rollback
 ```
 
-## Useful Links
+## API Endpoints
 
-Learn more about the power of Turborepo:
+### Authentication
+- `GET /auth/spotify` - Initiate Spotify authentication
+- `GET /auth/spotify/callback` - Spotify OAuth callback
+- `GET /auth/me` - Get current user session
+- `GET /auth/logout` - Logout user
 
-- [Tasks](https://turborepo.com/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.com/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.com/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.com/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.com/docs/reference/configuration)
-- [CLI Usage](https://turborepo.com/docs/reference/command-line-reference)
-# mixtape-2025
-# mixtape-2025
+### Playlists
+- `GET /playlists` - Get all playlists
+- `POST /playlists` - Create new playlist
+- `GET /playlists/:id` - Get playlist by ID
+- `PUT /playlists/:id` - Update playlist
+- `POST /playlists/:id/vote` - Vote for playlist
+- `DELETE /playlists/:id` - Delete playlist
+
+### Comments
+- `POST /comments` - Create new comment
+- `GET /playlists/:playlistId/comments` - Get playlist comments
+
+### Spotify Integration
+- `GET /spotify/playlist-name/:playlistId` - Get playlist name
+- `GET /spotify/playlist/:playlistId/tracks` - Get playlist tracks
+- `PUT /spotify/play` - Control playback
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Acknowledgments
+
+- Spotify Web API for music integration
+- Nominatim for geocoding services
+- The open-source community for various tools and libraries

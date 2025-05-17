@@ -7,6 +7,8 @@ export async function up(knex: Knex): Promise<void> {
     table.string("spotify_playlist_id").notNullable().unique();
     table.text("description");
     table.integer("votes").notNullable().defaultTo(0);
+    table.decimal("latitude", 10, 8); // Precision of 10 digits with 8 decimal places
+    table.decimal("longitude", 11, 8); // Precision of 11 digits with 8 decimal places
     table.timestamps(true, true); // Adds created_at and updated_at
   });
 }

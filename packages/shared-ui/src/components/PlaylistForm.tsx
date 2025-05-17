@@ -3,8 +3,15 @@
 import { useState, FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@repo/shared-contexts';
+import { LocationInput } from './LocationInput';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+
+interface Location {
+  latitude: number | null;
+  longitude: number | null;
+  address?: string;
+}
 
 export default function PlaylistForm() {
   const { user, isLoading: isAuthLoading } = useAuth();
@@ -14,6 +21,7 @@ export default function PlaylistForm() {
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingName, setIsFetchingName] = useState(false);
+  const [location, setLocation] = useState<Location>({ latitude: null, longitude: null });
   const router = useRouter();
 
   const extractSpotifyPlaylistId = (url: string): string | null => {
@@ -83,6 +91,11 @@ export default function PlaylistForm() {
       return;
     }
 
+    if (!location.latitude || !location.longitude) {
+      setError('Please select a location for your playlist.');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const response = await fetch(`${API_URL}/playlists`, {
@@ -90,7 +103,13 @@ export default function PlaylistForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ name, spotify_playlist_id: extractedId, description }),
+        body: JSON.stringify({
+          name,
+          spotify_playlist_id: extractedId,
+          description,
+          latitude: location.latitude,
+          longitude: location.longitude
+        }),
       });
       if (!response.ok) {
         const errorData = await response.json();
@@ -99,6 +118,7 @@ export default function PlaylistForm() {
       setName('');
       setSpotifyPlaylistUrl('');
       setDescription('');
+      setLocation({ latitude: null, longitude: null });
       router.refresh();
     } catch (e: any) {
       console.error("Failed to create playlist:", e);
@@ -148,6 +168,12 @@ export default function PlaylistForm() {
             className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm disabled:bg-gray-50"
           />
         </div>
+
+        <div className="mt-6">
+          <h3 className="text-lg font-medium text-gray-700 mb-4">Location</h3>
+          <LocationInput onLocationChange={setLocation} />
+        </div>
+
         <button
           type="submit"
           disabled={isSubmitting}
