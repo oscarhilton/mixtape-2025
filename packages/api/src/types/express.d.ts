@@ -1,6 +1,6 @@
-import 'express-serve-static-core';
+import "express-serve-static-core";
 
-declare module 'express-serve-static-core' {
+declare module "express-serve-static-core" {
   interface Request {
     spotifyAuthDetails?: {
       accessToken: string;
@@ -8,4 +8,4 @@ declare module 'express-serve-static-core' {
       tokenExpiresAt: number;
     };
   }
-} 
+}

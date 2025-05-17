@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from "@playwright/test";
 
 // Note: For actual Spotify login, Playwright cannot easily handle the external redirect
 // and login on Spotify's domain. True E2E tests for OAuth often require:
@@ -15,38 +15,47 @@ import { test, expect } from '@playwright/test';
 // Given the backend setup, the /auth/spotify/callback will redirect to the frontend.
 // We can test that the initial redirect to Spotify happens.
 
-test.describe('Authentication Flows', () => {
+test.describe("Authentication Flows", () => {
   test.beforeEach(async ({ page }) => {
     // Go to the home page before each test.
-    await page.goto('/');
+    await page.goto("/");
   });
 
-  test('should show login button when not authenticated', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Login with Spotify' })).toBeVisible();
+  test("should show login button when not authenticated", async ({ page }) => {
+    await expect(
+      page.getByRole("button", { name: "Login with Spotify" }),
+    ).toBeVisible();
   });
 
-  test('clicking login button should navigate towards Spotify', async ({ page }) => {
+  test("clicking login button should navigate towards Spotify", async ({
+    page,
+  }) => {
     // We can't fully test the Spotify login, but we can check the initial navigation attempt.
-    const loginButton = page.getByRole('button', { name: 'Login with Spotify' });
-    
+    const loginButton = page.getByRole("button", {
+      name: "Login with Spotify",
+    });
+
     // Intercept navigation to check the URL
     // This is a simplified check; a full check would involve waiting for the new page/URL.
-    let navigatedUrl = '';
-    page.on('request', request => {
-      if (request.isNavigationRequest() && request.url().startsWith('http://localhost:3001/auth/spotify')) {
+    let navigatedUrl = "";
+    page.on("request", (request) => {
+      if (
+        request.isNavigationRequest() &&
+        request.url().startsWith("http://localhost:3001/auth/spotify")
+      ) {
         navigatedUrl = request.url();
       }
     });
 
     await loginButton.click();
-    
-    // Wait for a brief moment for navigation to be initiated
-    await page.waitForTimeout(1000); 
 
-    // Because the actual navigation goes to an external site (Spotify via backend), 
+    // Wait for a brief moment for navigation to be initiated
+    await page.waitForTimeout(1000);
+
+    // Because the actual navigation goes to an external site (Spotify via backend),
     // we can't easily assert the final Spotify URL without more complex setup.
     // We check that the initial call to our backend auth route was made.
-    expect(navigatedUrl).toContain('/auth/spotify');
+    expect(navigatedUrl).toContain("/auth/spotify");
     // Further assertions would ideally check if the browser is on Spotify's domain, which is hard here.
   });
 
@@ -55,10 +64,13 @@ test.describe('Authentication Flows', () => {
   // 2. Have a test-specific endpoint on your backend that mocks a successful Spotify callback and sets the session.
   // For example, a GET /auth/mock-login?userId=... that creates a session for a test user.
 
-  test('after a (mocked) successful login, should show user name and logout button', async ({ page, context }) => {
+  test("after a (mocked) successful login, should show user name and logout button", async ({
+    page,
+    context,
+  }) => {
     // This test simulates a logged-in state by setting a cookie that the AuthContext might pick up.
     // This is a simplified approach. A more robust way is to have a backend route for mock login.
-    
+
     // IMPORTANT: This requires your AuthProvider to re-fetch user on navigation or focus if cookies change.
     // Or, we can navigate to a page that we expect to trigger the /auth/me check upon cookie presence.
 
@@ -70,9 +82,9 @@ test.describe('Authentication Flows', () => {
     // await page.request.get('http://localhost:3001/api/auth/mock-login-e2e?userId=testuser_e2e');
     // await page.reload(); // Reload to let AuthProvider pick up the new session
 
-    // Since we can't easily do the above without modifying the app for tests, 
-    // let's test that IF a user *were* logged in (e.g. by manually logging in once and reusing session state, 
-    // or by having the AuthProvider state be manipulable for tests - not ideal), 
+    // Since we can't easily do the above without modifying the app for tests,
+    // let's test that IF a user *were* logged in (e.g. by manually logging in once and reusing session state,
+    // or by having the AuthProvider state be manipulable for tests - not ideal),
     // then the logout button appears.
     // This part is hard to test reliably in pure E2E without a test helper endpoint for login.
 
@@ -80,7 +92,9 @@ test.describe('Authentication Flows', () => {
 
     // For now, let's just check the unauthenticated state again to ensure test structure is fine.
     // True E2E for OAuth login state needs more advanced techniques.
-    await expect(page.getByRole('button', { name: 'Login with Spotify' })).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Login with Spotify" }),
+    ).toBeVisible();
 
     // If you implement a mock login endpoint in your API for testing:
     // 1. Call it: await page.goto('http://localhost:3001/auth/mock-login?userId=testUserFromE2E');
@@ -89,7 +103,6 @@ test.describe('Authentication Flows', () => {
     // 3. Then: await expect(page.getByText('Welcome, TestUserFromE2E')).toBeVisible();
     //           await expect(page.getByRole('button', { name: 'Logout' })).toBeVisible();
   });
-
 });
 
 // Example for testing playlist form submission IF user is logged in
@@ -125,4 +138,4 @@ test.describe('Playlist Submission (when authenticated)', () => {
     await expect(page.getByText('Spotify ID: e2eSpotifyId123')).toBeVisible();
   });
 });
-*/ 
+*/

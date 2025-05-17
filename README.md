@@ -5,12 +5,14 @@ A modern web application that allows users to share and discover playlists with 
 ## Features
 
 - **Spotify Integration**
+
   - Seamless authentication with Spotify
   - Playlist creation and management
   - Real-time playback controls
   - Track comments and discussions
 
 - **Location-Based Features**
+
   - Automatic location detection
   - Manual address entry
   - Geocoding support via Nominatim
@@ -25,6 +27,7 @@ A modern web application that allows users to share and discover playlists with 
 ## Tech Stack
 
 - **Frontend**
+
   - Next.js 14
   - TypeScript
   - Tailwind CSS
@@ -32,6 +35,7 @@ A modern web application that allows users to share and discover playlists with 
   - React Context for state management
 
 - **Backend**
+
   - Express.js
   - Knex.js for database operations
   - PostgreSQL database
@@ -68,6 +72,7 @@ A modern web application that allows users to share and discover playlists with 
 ### Environment Setup
 
 1. Create a `.env` file in the root directory with the following variables:
+
 ```env
 # Spotify API
 SPOTIFY_CLIENT_ID=your_client_id
@@ -82,22 +87,26 @@ SESSION_SECRET=your_session_secret
 ```
 
 2. Install dependencies:
+
 ```bash
 pnpm install
 ```
 
 3. Run database migrations:
+
 ```bash
 cd packages/api
 pnpm migrate:latest
 ```
 
 4. Start the development servers:
+
 ```bash
 pnpm dev
 ```
 
 The application will be available at:
+
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:3001
 
@@ -113,17 +122,20 @@ The application will be available at:
 ### Database Migrations
 
 To create a new migration:
+
 ```bash
 cd packages/api
 pnpm migrate:make migration_name
 ```
 
 To run migrations:
+
 ```bash
 pnpm migrate:latest
 ```
 
 To rollback migrations:
+
 ```bash
 pnpm migrate:rollback
 ```
@@ -131,12 +143,14 @@ pnpm migrate:rollback
 ## API Endpoints
 
 ### Authentication
+
 - `GET /auth/spotify` - Initiate Spotify authentication
 - `GET /auth/spotify/callback` - Spotify OAuth callback
 - `GET /auth/me` - Get current user session
 - `GET /auth/logout` - Logout user
 
 ### Playlists
+
 - `GET /playlists` - Get all playlists
 - `POST /playlists` - Create new playlist
 - `GET /playlists/:id` - Get playlist by ID
@@ -145,10 +159,12 @@ pnpm migrate:rollback
 - `DELETE /playlists/:id` - Delete playlist
 
 ### Comments
+
 - `POST /comments` - Create new comment
 - `GET /playlists/:playlistId/comments` - Get playlist comments
 
 ### Spotify Integration
+
 - `GET /spotify/playlist-name/:playlistId` - Get playlist name
 - `GET /spotify/playlist/:playlistId/tracks` - Get playlist tracks
 - `PUT /spotify/play` - Control playback

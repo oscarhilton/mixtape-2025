@@ -1,26 +1,66 @@
 @import "tailwindcss";
 
+@theme {
+  /* Spotify-esque color palette */
+  --color-spotify-dark: #121212;
+  --color-spotify-light-dark: #181818;
+  --color-spotify-gray: #282828;
+  --color-spotify-light-gray: #b3b3b3;
+  --color-spotify-green: #1DB954;
+  /* Ableton-esque accents */
+  --color-ableton-blue: #00A0E0;
+  --color-ableton-orange: #FF7F00;
+
+  /* Font Families */
+  --font-sans: var(--font-geist-sans), sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+.dark {
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 18, 18, 18; /*spotify-light-dark*/
+  --background-end-rgb: 24, 24, 24; /* Slightly darker than spotify-light-dark */
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+    to bottom,
+    rgb(var(--background-start-rgb)),
+    rgb(var(--background-end-rgb))
+  );
+  min-height: 100vh;
+}
+
+/* Custom scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(var(--background-start-rgb)); /* Adapts to light/dark */
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888; /* Neutral thumb for light mode */
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Dark mode scrollbar */
+.dark ::-webkit-scrollbar-thumb {
+  background: #444; /* Darker thumb for dark mode */
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #666;
 }

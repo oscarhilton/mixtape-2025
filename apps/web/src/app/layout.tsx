@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@repo/shared-contexts";
 import { SpotifyPlayerProvider } from "@repo/shared-contexts";
 import { Header } from "@repo/shared-ui";
+import { ThemeProvider } from "@repo/shared-contexts";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,18 +27,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}>
-      <body className="h-full bg-spotify-dark text-spotify-light-gray">
-        <AuthProvider>
-          <SpotifyPlayerProvider>
-            <div className="flex flex-col h-full">
-              <Header />
-              <main className="flex-grow overflow-y-auto">
-                {children}
-              </main>
-            </div>
-          </SpotifyPlayerProvider>
-        </AuthProvider>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} antialiased h-full`}
+    >
+      <body className="h-full bg-spotify-light-dark dark:bg-spotify-dark font-sans">
+        <ThemeProvider>
+          <AuthProvider>
+            <SpotifyPlayerProvider>
+              <div className="flex flex-col h-full">
+                <Header />
+                <main className="flex-grow overflow-y-auto">{children}</main>
+              </div>
+            </SpotifyPlayerProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

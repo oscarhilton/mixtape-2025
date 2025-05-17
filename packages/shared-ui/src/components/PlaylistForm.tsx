@@ -1,11 +1,11 @@
-'use client';
+"use client";
 
-import { useState, FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '@repo/shared-contexts';
-import { LocationInput } from './LocationInput';
+import { useState, FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@repo/shared-contexts";
+import { LocationInput } from "./LocationInput";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 interface Location {
   latitude: number | null;
@@ -15,20 +15,24 @@ interface Location {
 
 export default function PlaylistForm() {
   const { user, isLoading: isAuthLoading } = useAuth();
-  const [name, setName] = useState('');
-  const [spotifyPlaylistUrl, setSpotifyPlaylistUrl] = useState('');
-  const [description, setDescription] = useState('');
+  const [name, setName] = useState("");
+  const [spotifyPlaylistUrl, setSpotifyPlaylistUrl] = useState("");
+  const [description, setDescription] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isFetchingName, setIsFetchingName] = useState(false);
-  const [location, setLocation] = useState<Location>({ latitude: null, longitude: null });
+  const [location, setLocation] = useState<Location>({
+    latitude: null,
+    longitude: null,
+  });
   const router = useRouter();
 
   const extractSpotifyPlaylistId = (url: string): string | null => {
     // Regex to capture playlist ID from various Spotify URL formats
     // e.g., https://open.spotify.com/playlist/PLAYLIST_ID?si=...
     // or spotify:playlist:PLAYLIST_ID
-    const regex = /^(?:spotify:playlist:|https:\/\/open\.spotify\.com\/playlist\/)([a-zA-Z0-9]+)/;
+    const regex =
+      /^(?:spotify:playlist:|https:\/\/open\.spotify\.com\/playlist\/)([a-zA-Z0-9]+)/;
     const match = url.match(regex);
     if (match && match[1]) {
       return match[1];
@@ -40,20 +44,26 @@ export default function PlaylistForm() {
     setIsFetchingName(true);
     setError(null);
     try {
-      const response = await fetch(`${API_URL}/spotify/playlist-name/${playlistId}`);
+      const response = await fetch(
+        `${API_URL}/spotify/playlist-name/${playlistId}`,
+      );
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Could not fetch playlist name from Spotify.');
+        throw new Error(
+          errorData.message || "Could not fetch playlist name from Spotify.",
+        );
       }
       const data = await response.json();
       if (data.name) {
         setName(data.name);
       } else {
-        throw new Error('Playlist name not found in Spotify response.');
+        throw new Error("Playlist name not found in Spotify response.");
       }
     } catch (e: any) {
       console.error("Failed to fetch playlist name:", e);
-      setError(`Failed to fetch playlist name: ${e.message}. Please enter manually.`);
+      setError(
+        `Failed to fetch playlist name: ${e.message}. Please enter manually.`,
+      );
     } finally {
       setIsFetchingName(false);
     }
@@ -66,7 +76,7 @@ export default function PlaylistForm() {
     if (extractedId) {
       fetchAndSetName(extractedId);
     } else {
-      setName('');
+      setName("");
     }
   };
 
@@ -77,47 +87,53 @@ export default function PlaylistForm() {
     const extractedId = extractSpotifyPlaylistId(spotifyPlaylistUrl);
 
     if (!extractedId) {
-      setError('Invalid Spotify Playlist URL. Please provide a valid URL like https://open.spotify.com/playlist/YOUR_PLAYLIST_ID or spotify:playlist:YOUR_PLAYLIST_ID');
+      setError(
+        "Invalid Spotify Playlist URL. Please provide a valid URL like https://open.spotify.com/playlist/YOUR_PLAYLIST_ID or spotify:playlist:YOUR_PLAYLIST_ID",
+      );
       return;
     }
 
     if (!name && !isFetchingName) {
-      setError('Playlist name could not be fetched. Please check the URL or try again.');
+      setError(
+        "Playlist name could not be fetched. Please check the URL or try again.",
+      );
       return;
     }
 
     if (isFetchingName) {
-      setError('Still fetching playlist name, please wait.');
+      setError("Still fetching playlist name, please wait.");
       return;
     }
 
     if (!location.latitude || !location.longitude) {
-      setError('Please select a location for your playlist.');
+      setError("Please select a location for your playlist.");
       return;
     }
 
     setIsSubmitting(true);
     try {
       const response = await fetch(`${API_URL}/playlists`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name,
           spotify_playlist_id: extractedId,
           description,
           latitude: location.latitude,
-          longitude: location.longitude
+          longitude: location.longitude,
         }),
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        throw new Error(
+          errorData.message || `HTTP error! status: ${response.status}`,
+        );
       }
-      setName('');
-      setSpotifyPlaylistUrl('');
-      setDescription('');
+      setName("");
+      setSpotifyPlaylistUrl("");
+      setDescription("");
       setLocation({ latitude: null, longitude: null });
       router.refresh();
     } catch (e: any) {
@@ -146,7 +162,12 @@ export default function PlaylistForm() {
       <h2 className="text-2xl font-semibold mb-4">Add New Playlist</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label htmlFor="spotifyPlaylistUrl" className="block text-sm font-medium text-gray-700">Spotify Playlist URL:</label>
+          <label
+            htmlFor="spotifyPlaylistUrl"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Spotify Playlist URL:
+          </label>
           <input
             id="spotifyPlaylistUrl"
             type="text"
@@ -158,7 +179,12 @@ export default function PlaylistForm() {
           />
         </div>
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description (Optional):</label>
+          <label
+            htmlFor="description"
+            className="block text-sm font-medium text-gray-700"
+          >
+            Description (Optional):
+          </label>
           <textarea
             id="description"
             value={description}
@@ -177,12 +203,12 @@ export default function PlaylistForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
+          className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-indigo-300"
         >
-          {isSubmitting ? 'Submitting...' : 'Add Playlist'}
+          {isSubmitting ? "Submitting..." : "Add Playlist"}
         </button>
       </form>
       {error && <p className="mt-4 text-red-500 text-sm">Error: {error}</p>}
     </section>
   );
-} 
+}

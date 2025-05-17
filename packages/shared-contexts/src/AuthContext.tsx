@@ -1,8 +1,14 @@
-'use client';
+"use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 interface User {
   id: number;
@@ -21,7 +27,9 @@ interface AuthContextType {
   accessToken: string | null;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const AuthContext = createContext<AuthContextType | undefined>(
+  undefined,
+);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
@@ -31,30 +39,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const fetchUser = async () => {
     setIsLoading(true);
     try {
-      const response = await fetch(`${API_URL}/auth/me`, { credentials: 'include' });
-      console.log('[AuthContext] fetchUser: /auth/me response status:', response.status);
+      const response = await fetch(`${API_URL}/auth/me`, {
+        credentials: "include",
+      });
+      console.log(
+        "[AuthContext] fetchUser: /auth/me response status:",
+        response.status,
+      );
       if (response.ok) {
         const data = await response.json();
-        console.log('[AuthContext] fetchUser: /auth/me raw data received:', data);
+        console.log(
+          "[AuthContext] fetchUser: /auth/me raw data received:",
+          data,
+        );
         const userToSet = data.user || null;
         const tokenToSet = data.accessToken || null;
-        console.log('[AuthContext] fetchUser: User object to set:', userToSet);
-        console.log('[AuthContext] fetchUser: AccessToken to set:', tokenToSet);
+        console.log("[AuthContext] fetchUser: User object to set:", userToSet);
+        console.log("[AuthContext] fetchUser: AccessToken to set:", tokenToSet);
         setUser(userToSet);
         setAccessToken(tokenToSet);
       } else {
         const errorText = await response.text();
-        console.error('[AuthContext] fetchUser: /auth/me failed. Status:', response.status, 'Response Text:', errorText);
+        console.error(
+          "[AuthContext] fetchUser: /auth/me failed. Status:",
+          response.status,
+          "Response Text:",
+          errorText,
+        );
         setUser(null);
         setAccessToken(null);
       }
     } catch (error) {
-      console.error("[AuthContext] fetchUser: Error during fetch operation:", error);
+      console.error(
+        "[AuthContext] fetchUser: Error during fetch operation:",
+        error,
+      );
       setUser(null);
       setAccessToken(null);
     } finally {
       setIsLoading(false);
-      console.log('[AuthContext] fetchUser: finished, isLoading set to false.');
+      console.log("[AuthContext] fetchUser: finished, isLoading set to false.");
     }
   };
 
@@ -70,7 +94,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setIsLoading(true);
     try {
-      await fetch(`${API_URL}/auth/logout`, { method: 'GET', credentials: 'include' });
+      await fetch(`${API_URL}/auth/logout`, {
+        method: "GET",
+        credentials: "include",
+      });
       setUser(null);
       setAccessToken(null);
     } catch (error) {
@@ -82,8 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const devLogin = async (devUserId: string) => {
-    if (process.env.NODE_ENV !== 'development') {
-      console.warn('Dev login is only available in development mode.');
+    if (process.env.NODE_ENV !== "development") {
+      console.warn("Dev login is only available in development mode.");
       return;
     }
     setIsLoading(true);
@@ -91,12 +118,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // For dev login, we might expect the backend to set a cookie/session
       // and then we fetch the user details like a normal login.
       const response = await fetch(`${API_URL}/auth/dev-login`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ userId: devUserId }), // Or however your dev endpoint expects it
-        credentials: 'include',
+        credentials: "include",
       });
 
       if (response.ok) {
@@ -125,24 +152,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    console.log('[AuthContext] Context value updated:', { user, isLoading, accessToken });
+    console.log("[AuthContext] Context value updated:", {
+      user,
+      isLoading,
+      accessToken,
+    });
   }, [user, isLoading, accessToken]);
 
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.NODE_ENV === "development") {
     contextValue.devLogin = devLogin;
   }
 
   return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={contextValue}>{children}</AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
-}; 
+};

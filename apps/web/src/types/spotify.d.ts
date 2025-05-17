@@ -12,4 +12,4 @@ declare global {
 // though usually referencing window.Spotify is enough after this global declaration.
 // Or it can be imported from '@types/spotify-web-playback-sdk' if that module makes it available directly.
 // For now, this ensures Window.Spotify is recognized.
-export {}; // This makes the file a module, which is required for 'declare global'. 
+export {}; // This makes the file a module, which is required for 'declare global'.

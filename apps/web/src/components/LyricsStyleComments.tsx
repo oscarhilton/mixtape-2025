@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useEffect, useState } from 'react';
-import Typewriter from 'typewriter-effect';
-import { useSpotifyPlayer } from '@repo/shared-contexts';
+import React, { useEffect, useState } from "react";
+import Typewriter from "typewriter-effect";
+import { useSpotifyPlayer } from "@repo/shared-contexts";
 
 interface Comment {
   id: number;
@@ -20,7 +20,10 @@ interface LyricsStyleCommentsProps {
   currentTrackUri?: string;
 }
 
-export function LyricsStyleComments({ comments, currentTrackUri }: LyricsStyleCommentsProps) {
+export function LyricsStyleComments({
+  comments,
+  currentTrackUri,
+}: LyricsStyleCommentsProps) {
   const { position } = useSpotifyPlayer();
   const [activeComment, setActiveComment] = useState<Comment | null>(null);
   const [showTypewriter, setShowTypewriter] = useState(false);
@@ -33,15 +36,21 @@ export function LyricsStyleComments({ comments, currentTrackUri }: LyricsStyleCo
 
     // Filter comments for current track and find the most recent one before current position
     const trackComments = comments
-      .filter(comment => comment.track_uri === currentTrackUri)
+      .filter((comment) => comment.track_uri === currentTrackUri)
       .sort((a, b) => a.timestamp_ms - b.timestamp_ms);
 
-    const currentComment = trackComments.reduce((prev, curr) => {
-      if (curr.timestamp_ms <= position && (!prev || curr.timestamp_ms > prev.timestamp_ms)) {
-        return curr;
-      }
-      return prev;
-    }, null as Comment | null);
+    const currentComment = trackComments.reduce(
+      (prev, curr) => {
+        if (
+          curr.timestamp_ms <= position &&
+          (!prev || curr.timestamp_ms > prev.timestamp_ms)
+        ) {
+          return curr;
+        }
+        return prev;
+      },
+      null as Comment | null,
+    );
 
     if (currentComment !== activeComment) {
       setShowTypewriter(false);
@@ -63,15 +72,15 @@ export function LyricsStyleComments({ comments, currentTrackUri }: LyricsStyleCo
   return (
     <div className="relative min-h-[200px] bg-gradient-to-b from-spotify-light-dark to-spotify-dark p-6 rounded-lg">
       <div className="absolute inset-0 bg-gradient-to-t from-spotify-dark/80 to-transparent pointer-events-none" />
-      
+
       <div className="relative z-10">
         <div className="mb-4">
           <p className="text-spotify-light-gray text-sm">
             {new Date(activeComment.timestamp_ms).toISOString().substr(14, 5)}
           </p>
         </div>
-        
-        <div className="text-2xl font-bold text-white leading-relaxed">
+
+        <div className="text-2xl font-bold leading-relaxed">
           {showTypewriter ? (
             <Typewriter
               options={{
@@ -79,7 +88,7 @@ export function LyricsStyleComments({ comments, currentTrackUri }: LyricsStyleCo
                 autoStart: true,
                 delay: 30,
                 deleteSpeed: 9999999, // Effectively disable deletion
-                cursor: '_',
+                cursor: "_",
                 loop: false,
               }}
             />
@@ -90,4 +99,4 @@ export function LyricsStyleComments({ comments, currentTrackUri }: LyricsStyleCo
       </div>
     </div>
   );
-} 
+}
