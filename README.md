@@ -1,3 +1,5 @@
+<img width="1505" alt="Screenshot 2025-05-17 at 22 40 49" src="https://github.com/user-attachments/assets/c1cdeac1-f71a-4c95-a17a-6baea0702aea" />
+
 # Music Sharing Platform
 
 A modern web application that allows users to share and discover playlists with location-based features. Built with Next.js, TypeScript, and Spotify integration.
@@ -5,7 +7,6 @@ A modern web application that allows users to share and discover playlists with 
 ## Features
 
 - **Spotify Integration**
-
   - Seamless authentication with Spotify
   - Playlist creation and management
   - Real-time playback controls
