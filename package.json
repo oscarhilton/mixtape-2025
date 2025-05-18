@@ -26,6 +26,8 @@
     "packages/*"
   ],
   "dependencies": {
-    "@headlessui/react": "^2.2.3"
+    "@headlessui/react": "^2.2.3",
+    "@types/styled-components": "^5.1.34",
+    "styled-components": "^6.1.18"
   }
 }

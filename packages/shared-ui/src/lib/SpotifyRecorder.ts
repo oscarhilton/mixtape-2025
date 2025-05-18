@@ -560,9 +560,9 @@ export class SpotifyRecorder {
 
     this.currentPlaybackSegment = this.playbackSegmentsQueue[this.currentPlaybackIndex] ?? null;
     if (!this.currentPlaybackSegment) {
-        console.error("[SpotifyRecorder] Error: Tried to play an undefined segment from master queue.");
-        this.stopPlaybackOfRecording(false);
-        return;
+      console.error("[SpotifyRecorder] Error: Tried to play an undefined segment from master queue.");
+      this.stopPlaybackOfRecording(false);
+      return;
     }
 
     const segment = this.currentPlaybackSegment;
@@ -578,13 +578,36 @@ export class SpotifyRecorder {
     } else if (segment.type === 'track' && segment.trackId && typeof segment.trackStartMs === 'number') {
       console.log(`[SpotifyRecorder] Playing track: ${segment.trackId} from ${segment.trackStartMs}ms (for ${segment.durationMs}ms)`);
       if (!this.player || !this.deviceId || !this.currentOAuthToken) {
-          console.error("[SpotifyRecorder] Player, Device ID, or OAuth token missing for track playback API call.");
-          this.stopPlaybackOfRecording(true);
-          return;
+        console.error("[SpotifyRecorder] Player, Device ID, or OAuth token missing for track playback API call.");
+        this.stopPlaybackOfRecording(true);
+        return;
       }
-      try {
-        // Using fetch for playback control. Ensure player is active on the device.
-        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${this.deviceId}`, {
+
+      const maxRetries = 3;
+      let retryCount = 0;
+      let success = false;
+
+      while (retryCount < maxRetries && !success) {
+        try {
+          // First ensure the device is active
+          const deviceResponse = await fetch('https://api.spotify.com/v1/me/player', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${this.currentOAuthToken}`,
+            },
+            body: JSON.stringify({
+              device_ids: [this.deviceId],
+              play: false
+            }),
+          });
+
+          if (!deviceResponse.ok) {
+            throw new Error(`Failed to activate device: ${deviceResponse.status} ${deviceResponse.statusText}`);
+          }
+
+          // Now try to play the track
+          const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${this.deviceId}`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
@@ -595,45 +618,64 @@ export class SpotifyRecorder {
               position_ms: segment.trackStartMs,
             }),
           });
-        
-        if (!response.ok) {
-            const errorBody = await response.text();
-            const apiError = new Error(`[SpotifyRecorder] Spotify API Error during track playback (${response.status}): ${response.statusText}. Body: ${errorBody}`);
-            console.error(apiError.message);
-            if (response.status === 401 && this.onAuthErrorCallback) {
-                this.currentOAuthToken = null;
-                this.onAuthErrorCallback(apiError);
-            } else if (this.onPlayerErrorCallback) {
-                this.onPlayerErrorCallback(apiError);
-            }
-            this.stopPlaybackOfRecording(true); // Stop on API error
-            return;
-        }
-
-        // Track is commanded to play. Now set a timeout for its recorded duration.
-        this.playbackTimeoutId = setTimeout(async () => {
-          if (!this.isPlayingRecording) return; // Playback might have been stopped
           
-          console.log(`[SpotifyRecorder] Track segment ${segment.trackId} recorded duration (${segment.durationMs}ms) elapsed.`);
-          try {
-            if (this.player && typeof this.player.pause === 'function') {
-                 // Attempt to pause the player, as this segment's time on the master timeline is up.
-                await this.player.pause();
-                console.log('[SpotifyRecorder] Paused player after track segment duration elapsed.');
+          if (!response.ok) {
+            const errorBody = await response.text();
+            if (response.status === 404) {
+              console.warn(`[SpotifyRecorder] Track not found (404): ${segment.trackId}. Retrying...`);
+              retryCount++;
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+              continue;
             }
-          } catch (pauseError: any) {
-            console.warn('[SpotifyRecorder] Could not pause player after track segment duration:', pauseError.message);
+            throw new Error(`Spotify API Error (${response.status}): ${response.statusText}. Body: ${errorBody}`);
           }
-          this.currentPlaybackIndex++;
-          this.playNextMasterSegment();
-        }, segment.durationMs);
 
-      } catch (error: any) {
-        const fetchError = new Error(`[SpotifyRecorder] Network or other error commanding track playback: ${error.message}`);
-        console.error(fetchError.message, error);
-        if (this.onPlayerErrorCallback) this.onPlayerErrorCallback(fetchError);
-        this.stopPlaybackOfRecording(true);
+          success = true;
+        } catch (error: any) {
+          console.error(`[SpotifyRecorder] Attempt ${retryCount + 1}/${maxRetries} failed:`, error.message);
+          if (error.message.includes('401') && this.onAuthErrorCallback) {
+            this.currentOAuthToken = null;
+            this.onAuthErrorCallback(error);
+            this.stopPlaybackOfRecording(true);
+            return;
+          }
+          retryCount++;
+          if (retryCount < maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
+          } else {
+            if (this.onPlayerErrorCallback) {
+              this.onPlayerErrorCallback(error);
+            }
+            this.stopPlaybackOfRecording(true);
+            return;
+          }
+        }
       }
+
+      if (!success) {
+        console.error("[SpotifyRecorder] Failed to play track after all retries");
+        this.stopPlaybackOfRecording(true);
+        return;
+      }
+
+      // Track is commanded to play. Now set a timeout for its recorded duration.
+      this.playbackTimeoutId = setTimeout(async () => {
+        if (!this.isPlayingRecording) return; // Playback might have been stopped
+        
+        console.log(`[SpotifyRecorder] Track segment ${segment.trackId} recorded duration (${segment.durationMs}ms) elapsed.`);
+        try {
+          if (this.player && typeof this.player.pause === 'function') {
+            // Attempt to pause the player, as this segment's time on the master timeline is up.
+            await this.player.pause();
+            console.log('[SpotifyRecorder] Paused player after track segment duration elapsed.');
+          }
+        } catch (pauseError: any) {
+          console.warn('[SpotifyRecorder] Could not pause player after track segment duration:', pauseError.message);
+        }
+        this.currentPlaybackIndex++;
+        this.playNextMasterSegment();
+      }, segment.durationMs);
+
     } else {
       console.warn('[SpotifyRecorder] Skipping invalid segment in master playback:', segment);
       this.currentPlaybackIndex++;
@@ -691,5 +733,49 @@ export class SpotifyRecorder {
     
     this.currentOAuthToken = null; // Clear cached token
     console.log('[SpotifyRecorder] Recorder disposed.');
+  }
+
+  // Get the current playback position in milliseconds
+  public getCurrentPosition(): number {
+    if (!this.lastPlayerState) return 0;
+    return this.lastPlayerState.position;
+  }
+
+  // Seek to a specific position in milliseconds
+  public async seekTo(positionMs: number): Promise<void> {
+    if (!this.player) {
+      console.error('[SpotifyRecorder] Cannot seek: Player not available');
+      return;
+    }
+    try {
+      await this.player.seek(positionMs);
+    } catch (error) {
+      console.error('[SpotifyRecorder] Error seeking to position:', error);
+      if (this.onPlayerErrorCallback) {
+        this.onPlayerErrorCallback(error instanceof Error ? error : new Error('Failed to seek'));
+      }
+    }
+  }
+
+  // Get the total duration of the current track in milliseconds
+  public getDuration(): number {
+    if (!this.lastPlayerState) return 0;
+    return this.lastPlayerState.duration;
+  }
+
+  // Get the current playback segment
+  public getCurrentPlaybackSegment(): RecordingSegment | null {
+    return this.currentPlaybackSegment;
+  }
+
+  // Get the current player state
+  public async getCurrentState(): Promise<Spotify.PlaybackState | null> {
+    if (!this.player) return null;
+    try {
+      return await this.player.getCurrentState();
+    } catch (error) {
+      console.error('[SpotifyRecorder] Error getting current state:', error);
+      return null;
+    }
   }
 } 
