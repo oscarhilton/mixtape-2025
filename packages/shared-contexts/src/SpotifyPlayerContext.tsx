@@ -66,21 +66,40 @@ export const SpotifyPlayerProvider = ({
   useEffect(() => {
     console.log(
       "[SpotifyPlayerProvider] Main useEffect triggered. AccessToken:",
-      accessToken,
+      accessToken ? "Present" : "Missing",
+      "Window.Spotify:",
+      window.Spotify ? "Loaded" : "Not loaded",
     );
     if (!accessToken) {
       console.log("[SpotifyPlayerProvider] No access token yet, returning.");
       return;
     }
     if (window.Spotify) {
+      console.log("[SpotifyPlayerProvider] Spotify SDK already loaded, initializing player.");
       initializePlayer(accessToken);
       return;
     }
+    console.log("[SpotifyPlayerProvider] Loading Spotify SDK script...");
     const script = document.createElement("script");
     script.src = "https://sdk.scdn.co/spotify-player.js";
     script.async = true;
+    
+    // Add load and error event listeners
+    script.onload = () => {
+      console.log("[SpotifyPlayerProvider] Spotify SDK script loaded successfully");
+    };
+    
+    script.onerror = (error) => {
+      console.error("[SpotifyPlayerProvider] Failed to load Spotify SDK script:", error);
+    };
+    
     document.body.appendChild(script);
-    window.onSpotifyWebPlaybackSDKReady = () => initializePlayer(accessToken);
+    console.log("[SpotifyPlayerProvider] Spotify SDK script element added to document");
+    
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      console.log("[SpotifyPlayerProvider] Spotify SDK ready callback triggered.");
+      initializePlayer(accessToken);
+    };
 
     return () => {
       console.log(
@@ -91,7 +110,7 @@ export const SpotifyPlayerProvider = ({
         clearInterval(positionPollIntervalRef.current);
       }
     };
-  }, [accessToken]); // Removed player from deps, initializePlayer is useCallback without player
+  }, [accessToken]);
 
   // DEBUG: Check user's Spotify product type
   useEffect(() => {
@@ -146,19 +165,27 @@ export const SpotifyPlayerProvider = ({
   // END DEBUG
 
   const initializePlayer = useCallback((token: string) => {
-    console.log("[SpotifyPlayerProvider] initializePlayer called.");
-    if (!window.Spotify || !window.Spotify.Player) return;
+    console.log("[SpotifyPlayerProvider] initializePlayer called with token:", token ? "Present" : "Missing");
+    if (!window.Spotify || !window.Spotify.Player) {
+      console.error("[SpotifyPlayerProvider] Spotify SDK not available for initialization");
+      return;
+    }
 
+    console.log("[SpotifyPlayerProvider] Creating new Spotify player instance...");
     const newPlayer = new window.Spotify.Player({
       name: "Mixtape In A Bottle Web Player",
-      getOAuthToken: (cb) => cb(token),
+      getOAuthToken: (cb) => {
+        console.log("[SpotifyPlayerProvider] getOAuthToken callback triggered");
+        cb(token);
+      },
       volume: 0.5,
     });
 
     newPlayer.addListener("ready", ({ device_id }) => {
       console.log(
-        "[SpotifyPlayerProvider] Player Ready with Device ID",
+        "[SpotifyPlayerProvider] Player Ready with Device ID:",
         device_id,
+        "Setting player state to ready"
       );
       setPlayerState((ps) => ({ ...ps, deviceId: device_id, isReady: true }));
     });
@@ -167,6 +194,7 @@ export const SpotifyPlayerProvider = ({
       console.log(
         "[SpotifyPlayerProvider] Player Not Ready. Device ID:",
         device_id,
+        "Setting player state to not ready"
       );
       setPlayerState((ps) => ({
         ...ps,
@@ -176,56 +204,32 @@ export const SpotifyPlayerProvider = ({
       }));
     });
 
-    newPlayer.addListener(
-      "player_state_changed",
-      (state: Spotify.PlaybackState | null) => {
-        console.log(
-          "[SpotifyPlayerContext] player_state_changed event. SDK state.position:",
-          state?.position,
-        );
-        if (!state) {
-          setPlayerState((ps) => ({
-            ...ps,
-            isActive: false,
-            isPaused: true,
-            currentTrack: null,
-            position: null,
-            duration: null,
-          }));
-          return;
-        }
-        setPlayerState((ps) => ({
-          ...ps,
-          isActive: true,
-          isPaused: state.paused,
-          currentTrack: state.track_window.current_track,
-          position: state.position,
-          duration: state.duration,
-        }));
-      },
-    );
-
-    // Add other listeners (error handling etc.) from your previous setup
-    newPlayer.addListener("initialization_error", ({ message }) =>
-      console.error("Failed to initialize:", message),
-    );
-    newPlayer.addListener("authentication_error", ({ message }) =>
-      console.error("Failed to authenticate:", message),
-    );
-    newPlayer.addListener("account_error", ({ message }) =>
-      console.error("Account error:", message),
-    );
-    newPlayer.addListener("playback_error", ({ message }) =>
-      console.error("Playback error:", message),
-    );
-
-    newPlayer.connect().then((success) => {
-      if (success)
-        console.log("[SpotifyPlayerProvider] Player connected successfully!");
-      else console.log("[SpotifyPlayerProvider] Player failed to connect.");
+    newPlayer.addListener("initialization_error", ({ message }) => {
+      console.error("[SpotifyPlayerProvider] Failed to initialize:", message);
     });
-    setPlayer(newPlayer);
-  }, []); // Empty dependency array as token is passed directly
+
+    newPlayer.addListener("authentication_error", ({ message }) => {
+      console.error("[SpotifyPlayerProvider] Failed to authenticate:", message);
+    });
+
+    newPlayer.addListener("account_error", ({ message }) => {
+      console.error("[SpotifyPlayerProvider] Account error:", message);
+    });
+
+    newPlayer.addListener("playback_error", ({ message }) => {
+      console.error("[SpotifyPlayerProvider] Playback error:", message);
+    });
+
+    console.log("[SpotifyPlayerProvider] Attempting to connect player...");
+    newPlayer.connect().then((success) => {
+      if (success) {
+        console.log("[SpotifyPlayerProvider] Player connected successfully!");
+        setPlayer(newPlayer);
+      } else {
+        console.error("[SpotifyPlayerProvider] Player failed to connect!");
+      }
+    });
+  }, []);
 
   // Effect for polling position
   useEffect(() => {
@@ -295,18 +299,15 @@ export const SpotifyPlayerProvider = ({
     position_ms?: number;
   }) => {
     console.log(
-      "[SpotifyPlayerProvider] play called. Device ID from playerState:",
-      playerState.deviceId,
-      "Options:",
-      options,
-      "Player instance available:",
-      !!player,
-      "Access Token available:",
-      !!accessToken,
+      "[SpotifyPlayerProvider] play called with options:",
+      JSON.stringify(options, null, 2),
+      "\nDevice ID:", playerState.deviceId,
+      "\nPlayer instance:", !!player,
+      "\nAccess Token:", !!accessToken,
     );
     if (!player || !playerState.deviceId || !accessToken) {
       console.error(
-        "Cannot play: Player not ready, no device ID, or no access token.",
+        "[SpotifyPlayerProvider] Cannot play: Missing required components",
         {
           playerReady: !!player,
           deviceId: playerState.deviceId,
@@ -315,32 +316,26 @@ export const SpotifyPlayerProvider = ({
       );
       return;
     }
-    console.log(
-      `[SpotifyPlayerProvider] Attempting to play:`,
-      options,
-      "on device:",
-      playerState.deviceId,
-    );
 
     try {
-      // We need to pass the user's Spotify access token for this API call
+      const requestBody = {
+        device_id: playerState.deviceId,
+        ...(options?.contextUri && { context_uri: options.contextUri }),
+        ...(options?.uris && { uris: options.uris }),
+        ...(options?.offset && { offset: options.offset }),
+        ...(options?.position_ms && { position_ms: options.position_ms }),
+      };
+      console.log("[SpotifyPlayerProvider] Sending playback request:", JSON.stringify(requestBody, null, 2));
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/spotify/play`,
         {
-          method: "PUT", // Spotify API uses PUT for this endpoint
+          method: "PUT",
           headers: {
             "Content-Type": "application/json",
-            // The backend will use the user's session-stored access token.
-            // If direct frontend-to-spotify call was made, Authorization header would be needed here.
           },
-          credentials: "include", // Send cookies for session-based auth to our backend
-          body: JSON.stringify({
-            device_id: playerState.deviceId,
-            ...(options?.contextUri && { context_uri: options.contextUri }),
-            ...(options?.uris && { uris: options.uris }),
-            ...(options?.offset && { offset: options.offset }),
-            ...(options?.position_ms && { position_ms: options.position_ms }),
-          }),
+          credentials: "include",
+          body: JSON.stringify(requestBody),
         },
       );
 
@@ -349,20 +344,21 @@ export const SpotifyPlayerProvider = ({
           .json()
           .catch(() => ({ message: "Failed to parse error response" }));
         console.error(
-          "Failed to start playback via backend:",
-          response.status,
-          errorData,
+          "[SpotifyPlayerProvider] Playback request failed:",
+          {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+          }
         );
         throw new Error(
           `Playback API call failed: ${errorData.message || response.statusText}`,
         );
       }
-      console.log(
-        "[SpotifyPlayerProvider] Play command sent to backend successfully.",
-      );
-      // Playback should start on the selected device. Player state will update via 'player_state_changed' event.
+      console.log("[SpotifyPlayerProvider] Play command sent successfully");
     } catch (error) {
-      console.error("Error in play function:", error);
+      console.error("[SpotifyPlayerProvider] Error in play function:", error);
+      throw error; // Re-throw to allow caller to handle the error
     }
   };
 

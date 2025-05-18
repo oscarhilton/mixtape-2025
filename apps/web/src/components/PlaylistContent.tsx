@@ -164,17 +164,23 @@ export const PlaylistContent: React.FC<PlaylistContentProps> = ({
   };
 
   const handlePlayTrack = async (trackUri: string) => {
+    console.log("[PlaylistContent] Track clicked:", {
+      trackUri,
+      deviceId,
+      hasContext: !!currentPlaylistDetails?.spotify_playlist_id,
+      contextUri: currentPlaylistDetails?.spotify_playlist_id ? `spotify:playlist:${currentPlaylistDetails.spotify_playlist_id}` : undefined
+    });
+
     if (!deviceId) {
+      console.error("[PlaylistContent] Cannot play track: No device ID available");
       alert("Spotify player not ready.");
       return;
     }
+
     const spotifyContextUri = currentPlaylistDetails?.spotify_playlist_id
       ? `spotify:playlist:${currentPlaylistDetails.spotify_playlist_id}`
       : undefined;
 
-    console.log(
-      `[PlaylistContent] Clicked track. Attempting to play track URI: ${trackUri}, with context URI: ${spotifyContextUri || '(none)'}`,
-    );
     try {
       const playOptions: {
         contextUri?: string;
@@ -186,13 +192,21 @@ export const PlaylistContent: React.FC<PlaylistContentProps> = ({
       if (spotifyContextUri) {
         playOptions.contextUri = spotifyContextUri;
         playOptions.offset = { uri: trackUri }; // Play this specific track within the context
+        console.log("[PlaylistContent] Playing track in context:", {
+          contextUri: spotifyContextUri,
+          trackUri
+        });
       } else {
-        playOptions.uris = [trackUri]; // Play track directly if no context (e.g., single track view)
+        playOptions.uris = [trackUri]; // Play track directly if no context
+        console.log("[PlaylistContent] Playing track directly:", {
+          uris: [trackUri]
+        });
       }
 
       await startPlayback(playOptions);
     } catch (error) {
-      console.error(`[PlaylistContent] Error starting track playback:`, error);
+      console.error("[PlaylistContent] Error starting track playback:", error);
+      alert("Failed to play track. Please try again.");
     }
   };
 

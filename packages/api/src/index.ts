@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, { Request, Response, NextFunction, RequestHandler } from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import knexConstructor from "knex";
@@ -19,7 +19,11 @@ dotenv.config();
 
 const app = express();
 const port = process.env.API_PORT || 3001;
-const db = knexConstructor(knexfile.development);
+
+// Use the correct database configuration based on environment
+const db = knexConstructor(
+  process.env.NODE_ENV === 'production' ? knexfile.production : knexfile.development
+);
 
 // Spotify Access Token Cache (Client Credentials Flow)
 let spotifyAccessToken: string | null = null;
@@ -92,7 +96,7 @@ async function getValidSpotifyToken(): Promise<string | null> {
 
 // Helper function to refresh user's Spotify access token if needed
 async function getRefreshedUserSpotifyToken(
-  req: Request,
+  req: express.Request,
 ): Promise<string | null> {
   if (!req.session || !req.session.spotifyRefreshToken) {
     console.error("[TokenRefresh] No refresh token in session.");
@@ -191,15 +195,16 @@ async function getRefreshedUserSpotifyToken(
 // Session configuration
 app.use(
   session({
-    secret: process.env.SESSION_SECRET || "fallback_secret_for_development", // Fallback for safety
+    secret: process.env.SESSION_SECRET || "fallback_secret_for_development",
     resave: false,
-    saveUninitialized: false, // Don't create session until something stored
+    saveUninitialized: false,
     cookie: {
-      secure: process.env.NODE_ENV === "production", // true in production if using HTTPS
+      secure: process.env.NODE_ENV === "production",
+      httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000, // 24 hours
-      sameSite: "lax", // Explicitly set SameSite to Lax for development
-    },
-  }),
+      sameSite: "lax"
+    }
+  })
 );
 
 // Passport configuration
@@ -207,7 +212,7 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 passport.serializeUser((user: any, done) => {
-  done(null, user.id); // Store user ID in session
+  done(null, user.id);
 });
 
 passport.deserializeUser(async (id: number, done) => {
@@ -223,13 +228,12 @@ if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
   console.error(
     "ERROR: Spotify Client ID or Secret not configured in .env file!",
   );
-  // process.exit(1); // Optionally exit if not configured
 } else {
   passport.use(
     new SpotifyStrategy(
       {
-        clientID: process.env.SPOTIFY_CLIENT_ID!,
-        clientSecret: process.env.SPOTIFY_CLIENT_SECRET!,
+        clientID: process.env.SPOTIFY_CLIENT_ID,
+        clientSecret: process.env.SPOTIFY_CLIENT_SECRET,
         callbackURL: `http://localhost:${port}/auth/spotify/callback`,
         scope: [
           "user-read-email",
@@ -239,248 +243,104 @@ if (!process.env.SPOTIFY_CLIENT_ID || !process.env.SPOTIFY_CLIENT_SECRET) {
           "user-modify-playback-state",
           "user-read-playback-state",
         ],
-        passReqToCallback: true, // Pass req object to the callback
+        passReqToCallback: true,
       },
-      async (
-        req: Request,
+      (async (
+        req: express.Request,
         accessToken: string,
         refreshToken: string,
         expires_in: number,
         profile: SpotifyProfile,
         done: (error: any, user?: any) => void,
       ) => {
-        console.log(
-          "[SpotifyStrategy] Callback invoked. AccessToken received (first 20 chars):",
-          accessToken.substring(0, 20),
-        );
-        console.log(
-          "[SpotifyStrategy] Profile object received:",
-          JSON.stringify(profile, null, 2),
-        ); // Log the full profile object
-
         try {
           req.spotifyAuthDetails = {
             accessToken,
             refreshToken,
             tokenExpiresAt: Date.now() + expires_in * 1000,
           };
-          console.log(
-            "[SpotifyStrategy] Auth details attached to req:",
-            req.spotifyAuthDetails,
-          );
 
           if (!profile || !profile.id) {
-            console.error(
-              "[SpotifyStrategy] Critical: Profile or profile.id is missing!",
-              profile,
-            );
             return done(new Error("Spotify profile ID is missing"));
           }
 
-          console.log(
-            `[SpotifyStrategy] Looking for user with spotify_id: ${profile.id}`,
-          );
           let user = await db("users")
             .where({ spotify_id: profile.id })
             .first();
-          console.log(
-            "[SpotifyStrategy] Result of db.where for existing user:",
-            user,
-          );
 
           if (user) {
-            console.log("[SpotifyStrategy] Existing user found:", user.id);
             return done(null, user);
           } else {
-            console.log(
-              "[SpotifyStrategy] New user. Profile ID:",
-              profile.id,
-              "Display Name:",
-              profile.displayName,
-            );
-            console.log("[SpotifyStrategy] Attempting to insert new user...");
-            const newUserRecord = {
+            const [newUserId] = await db("users").insert({
               spotify_id: profile.id,
-              display_name:
-                profile.displayName || profile.username || "Spotify User", // Fallback for display name
-              email:
-                profile.emails && profile.emails.length > 0
-                  ? profile.emails[0].value
-                  : null, // Safely access email
-            };
-            console.log(
-              "[SpotifyStrategy] New user data to insert:",
-              newUserRecord,
-            );
-
-            const [newUserId] = await db("users").insert(newUserRecord);
-            console.log(
-              "[SpotifyStrategy] Insert result (newUserId):",
-              newUserId,
-            );
+              display_name: profile.displayName || profile.username || "Spotify User",
+              email: profile.emails && profile.emails.length > 0
+                ? profile.emails[0].value
+                : null,
+            });
 
             user = await db("users").where({ id: newUserId }).first();
-            console.log(
-              "[SpotifyStrategy] New user created and fetched:",
-              user,
-            );
-
-            if (!user) {
-              console.error(
-                "[SpotifyStrategy] Critical: Failed to fetch newly created user!",
-              );
-              return done(new Error("Failed to retrieve user after creation."));
-            }
             return done(null, user);
           }
         } catch (err: any) {
-          console.error(
-            "[SpotifyStrategy] Error during database operation or profile processing:",
-            err,
-          );
           return done(err);
         }
-      },
-    ),
+      }) as unknown as (...args: any[]) => void
+    )
   );
 }
 
+// CORS and JSON middleware
 app.use(
   cors({
-    origin: ["http://localhost:3000", "http://localhost:3002"], // Allow both typical frontend ports
-    credentials: true, // Allow cookies to be sent
+    origin: ["http://localhost:3000", "http://localhost:3002"],
+    credentials: true,
   }),
 );
 app.use(express.json());
 
+// Error handling middleware
+const asyncHandler = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>): RequestHandler => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+};
+
 // Mount playlist routes
 app.use('/api/playlists', playlistRoutes);
-
-// Middleware to check if user is authenticated
-// const isAuthenticated = (req: any, res: any, next: NextFunction) => { // Remove this inline definition
-//   if (req.isAuthenticated()) {
-//     return next();
-//   }
-//   res.status(401).json({ message: "User not authenticated." });
-// };
 
 // Auth Routes
 app.get("/auth/spotify", passport.authenticate("spotify"));
 
 app.get(
   "/auth/spotify/callback",
-  (req: Request, res: Response, next: NextFunction) => {
-    passport.authenticate(
-      "spotify",
-      // No options here, or only options applicable to all authenticate calls, not strategy-specific ones
-      (
-        err: any,
-        user: Express.User | false | null,
-        info: any,
-        status: number | undefined,
-      ) => {
-        console.log(
-          "[SpotifyCallback-Custom] passport.authenticate callback reached.",
-        );
+  passport.authenticate("spotify", {
+    failureRedirect: "/auth/login-failed",
+  }),
+  (req: Request, res: Response) => {
+    console.log("[SpotifyCallback] Auth details:", req.spotifyAuthDetails ? "Present" : "Missing");
+    // Store the Spotify tokens in the session
+    if (req.spotifyAuthDetails) {
+      console.log("[SpotifyCallback] Saving tokens to session");
+      req.session.spotifyAccessToken = req.spotifyAuthDetails.accessToken;
+      req.session.spotifyRefreshToken = req.spotifyAuthDetails.refreshToken;
+      req.session.spotifyTokenExpiresAt = req.spotifyAuthDetails.tokenExpiresAt;
+      req.session.save((err) => {
         if (err) {
-          console.error(
-            "[SpotifyCallback-Custom] Authentication error (err):",
-            err,
-          );
-          // Potentially use info for more details if err is generic
-          const message =
-            info?.message || err.message || "Spotify authentication failed.";
-          if (req.session) {
-            req.session.messages = req.session.messages || [];
-            req.session.messages.push(
-              typeof message === "string" ? message : JSON.stringify(message),
-            );
-            req.session.save(); // Ensure messages are saved before redirect
-          }
-          return res.redirect("/auth/login-failed");
+          console.error("[SpotifyCallback] Error saving session:", err);
+        } else {
+          console.log("[SpotifyCallback] Successfully saved tokens to session");
         }
-        if (!user) {
-          console.error(
-            "[SpotifyCallback-Custom] Authentication failed: No user returned. Info:",
-            info,
-            "Status:",
-            status,
-          );
-          const message = info?.message || "Authentication failed: No user.";
-          if (req.session) {
-            req.session.messages = req.session.messages || [];
-            req.session.messages.push(
-              typeof message === "string" ? message : JSON.stringify(message),
-            );
-            req.session.save();
-          }
-          return res.redirect("/auth/login-failed");
-        }
-
-        // If we get here, authentication was successful, proceed to log in the user
-        req.logIn(user, (loginErr) => {
-          if (loginErr) {
-            console.error(
-              "[SpotifyCallback-Custom] req.logIn error:",
-              loginErr,
-            );
-            if (req.session) {
-              req.session.messages = req.session.messages || [];
-              req.session.messages.push(
-                loginErr.message || "Login after authentication failed.",
-              );
-              req.session.save();
-            }
-            return res.redirect("/auth/login-failed");
-          }
-
-          // Successful login, now handle session details for Spotify tokens
-          if (req.spotifyAuthDetails && req.session) {
-            console.log(
-              "[SpotifyCallback-Custom] User authenticated by custom callback:",
-              user,
-            );
-            console.log(
-              "[SpotifyCallback-Custom] Spotify auth details found on req:",
-              req.spotifyAuthDetails,
-            );
-            req.session.spotifyAccessToken = req.spotifyAuthDetails.accessToken;
-            req.session.spotifyRefreshToken =
-              req.spotifyAuthDetails.refreshToken;
-            req.session.spotifyTokenExpiresAt =
-              req.spotifyAuthDetails.tokenExpiresAt;
-            console.log(
-              "[SpotifyCallback-Custom] Spotify tokens stored in session.",
-            );
-            req.session.save((saveErr) => {
-              if (saveErr) {
-                console.error(
-                  "[SpotifyCallback-Custom] Error saving session with tokens:",
-                  saveErr,
-                );
-                // Fall through to redirect, but log the error
-              }
-              return res.redirect("http://localhost:3000/");
-            });
-          } else {
-            console.error(
-              "[SpotifyCallback-Custom] Auth success but spotifyAuthDetails or session missing on req after login.",
-            );
-            if (req.session) {
-              req.session.messages = req.session.messages || [];
-              req.session.messages.push("Internal setup error after login.");
-              req.session.save();
-            }
-            return res.redirect("/auth/login-failed");
-          }
-        });
-      },
-    )(req, res, next); // Important to call the handler this way for custom callbacks
-  },
+      });
+    } else {
+      console.error("[SpotifyCallback] No auth details available to save");
+    }
+    res.redirect("http://localhost:3000/");
+  }
 );
 
 // Existing route to handle login failures
-app.get("/auth/login-failed", (req: Request, res: Response) => {
+app.get("/auth/login-failed", (req, res) => {
   const messages = req.session?.messages || [];
   console.error("[LoginFailed] Authentication failed. Messages:", messages);
   // Clear any messages if you only want to show them once
@@ -507,20 +367,25 @@ app.get("/auth/logout", (req, res, next) => {
 });
 
 // Endpoint to check current user session
-app.get("/auth/me", (req: Request, res: Response) => {
+app.get("/auth/me", (req: express.Request, res: express.Response) => {
   console.log("[AuthMe] Session content:", req.session);
+  console.log("[AuthMe] Is authenticated:", req.isAuthenticated());
+  console.log("[AuthMe] User:", req.user);
+  console.log("[AuthMe] Access token present:", !!req.session?.spotifyAccessToken);
+  
   if (req.isAuthenticated() && req.user && req.session) {
     const userObject = req.user as any;
-    res.json({
-      user: {
-        id: userObject.id,
-        spotify_id: userObject.spotify_id,
-        display_name: userObject.display_name,
-        email: userObject.email,
-      },
-      accessToken: req.session.spotifyAccessToken || null, // Retrieve from session
+    const response = {
+      user: userObject,
+      accessToken: req.session.spotifyAccessToken
+    };
+    console.log("[AuthMe] Sending response:", {
+      ...response,
+      accessToken: response.accessToken ? "Present" : "Missing"
     });
+    res.json(response);
   } else {
+    console.log("[AuthMe] Not authenticated or missing session/user");
     res.status(401).json({ message: "Not authenticated" });
   }
 });
@@ -528,152 +393,110 @@ app.get("/auth/me", (req: Request, res: Response) => {
 // Spotify API Proxy Routes (using server-side token)
 app.get(
   "/spotify/playlist-name/:playlistId",
-  async (req: Request, res: Response, next: NextFunction) => {
-    (async () => {
-      const { playlistId } = req.params;
-      const token = await getValidSpotifyToken();
-      if (!token) {
-        return res
-          .status(503)
-          .json({ message: "Could not retrieve Spotify API token." });
-      }
-      try {
-        const response = await fetch(
-          `https://api.spotify.com/v1/playlists/${playlistId}?fields=name`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          },
-        );
-        if (!response.ok) {
-          const errorBody = await response.text();
-          console.error(
-            `Spotify API error for playlist name ${playlistId}: ${response.status}`,
-            errorBody,
-          );
-          return res.status(response.status).json({
-            message: "Failed to fetch playlist name from Spotify.",
-            details: errorBody,
-          });
-        }
-        const data = (await response.json()) as { name: string };
-        res.json({ name: data.name });
-      } catch (error) {
-        console.error(`Error fetching playlist name for ${playlistId}:`, error);
-        next(error); // Pass to generic error handler
-      }
-    })().catch(next);
-  },
+  asyncHandler(async (req: Request, res: Response) => {
+    const { playlistId } = req.params;
+    const token = await getValidSpotifyToken();
+    if (!token) {
+      return res
+        .status(503)
+        .json({ message: "Could not retrieve Spotify API token." });
+    }
+    const response = await fetch(
+      `https://api.spotify.com/v1/playlists/${playlistId}?fields=name`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
+    if (!response.ok) {
+      const errorBody = await response.text();
+      console.error(
+        `Spotify API error for playlist name ${playlistId}: ${response.status}`,
+        errorBody,
+      );
+      return res.status(response.status).json({
+        message: "Failed to fetch playlist name from Spotify.",
+        details: errorBody,
+      });
+    }
+    const data = (await response.json()) as { name: string };
+    res.json({ name: data.name });
+  })
 );
 
 app.get(
   "/spotify/playlist/:playlistId/tracks",
-  async (req: Request, res: Response, next: NextFunction) => {
-    (async () => {
-      const { playlistId } = req.params;
-      const token = await getValidSpotifyToken(); // Use server-side token
-      if (!token) {
-        return res.status(503).json({
-          message: "Could not retrieve Spotify API token for server.",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { playlistId } = req.params;
+    const token = await getValidSpotifyToken();
+    if (!token) {
+      return res.status(503).json({
+        message: "Could not retrieve Spotify API token for server.",
+      });
+    }
+    const fields = "items(track(id,name,artists(name),album(name,images),uri,duration_ms))";
+    const limit = 50;
+    let offset = 0;
+    let allTracks: any[] = [];
+    let hasMore = true;
+    while (hasMore) {
+      const response = await fetch(
+        `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=${fields}&limit=${limit}&offset=${offset}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (!response.ok) {
+        const errorBody = await response.text();
+        console.error(
+          `Spotify API error for playlist tracks ${playlistId}: ${response.status}`,
+          errorBody,
+        );
+        if (response.status === 404) {
+          return res.status(404).json({
+            message: `Playlist with ID ${playlistId} not found on Spotify.`,
+            details: errorBody,
+          });
+        }
+        return res.status(response.status).json({
+          message: "Failed to fetch playlist tracks from Spotify.",
+          details: errorBody,
         });
       }
-      try {
-        // You can adjust 'fields' to get more or less data about tracks
-        // e.g., fields=items(track(name,artists,album(name,images),uri,id,duration_ms))
-        const fields =
-          "items(track(id,name,artists(name),album(name,images),uri,duration_ms))";
-        const limit = 50; // Spotify API limit per request
-        let offset = 0;
-        let allTracks: any[] = [];
-        let hasMore = true;
-
-        while (hasMore) {
-          const response = await fetch(
-            `https://api.spotify.com/v1/playlists/${playlistId}/tracks?fields=${fields}&limit=${limit}&offset=${offset}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            },
-          );
-
-          if (!response.ok) {
-            const errorBody = await response.text();
-            console.error(
-              `Spotify API error for playlist tracks ${playlistId}: ${response.status}`,
-              errorBody,
-            );
-            // Check for specific 404 for playlist not found
-            if (response.status === 404) {
-              return res.status(404).json({
-                message: `Playlist with ID ${playlistId} not found on Spotify.`,
-                details: errorBody,
-              });
-            }
-            return res.status(response.status).json({
-              message: "Failed to fetch playlist tracks from Spotify.",
-              details: errorBody,
-            });
-          }
-
-          const pageData = (await response.json()) as {
-            items: any[];
-            next: string | null;
-            total: number;
-          };
-          if (pageData.items) {
-            allTracks = allTracks.concat(
-              pageData.items.map((item) => item.track).filter((track) => track),
-            ); // Ensure track is not null
-          }
-
-          if (pageData.next) {
-            offset += limit;
-          } else {
-            hasMore = false;
-          }
-          // Safety break if a playlist somehow claims to have more items than a reasonable limit,
-          // or if there are no items and next is still present (unlikely).
-          if (offset > (pageData.total || 500) + limit) {
-            // pageData.total might not always be accurate or present for all field selections
-            console.warn(
-              `[Spotify Tracks] Exceeded expected offset for playlist ${playlistId}. Total items: ${pageData.total}, current offset: ${offset}. Breaking loop.`,
-            );
-            hasMore = false;
-          }
-          if (
-            !pageData.items ||
-            (pageData.items.length === 0 && pageData.next)
-          ) {
-            console.warn(
-              `[Spotify Tracks] No items returned but 'next' URL present for playlist ${playlistId}. Offset: ${offset}. Breaking loop.`,
-            );
-            hasMore = false;
-          }
-        }
-        // The structure expected by the frontend's Track interface is directly { id, name, artists, album, uri, duration_ms }
-        // The Spotify API nests this under `track` within each item.
-        // The mapping `item => item.track` above handles this.
-        res.json(allTracks);
-      } catch (error) {
-        console.error(
-          `Error fetching playlist tracks for ${playlistId}:`,
-          error,
+      const pageData = (await response.json());
+      if (pageData.items) {
+        allTracks = allTracks.concat(
+          pageData.items.map((item: any) => item.track).filter((track: any) => track),
         );
-        next(error);
       }
-    })().catch(next);
-  },
+      if (pageData.next) {
+        offset += limit;
+      } else {
+        hasMore = false;
+      }
+      if (offset > (pageData.total || 500) + limit) {
+        console.warn(
+          `[Spotify Tracks] Exceeded expected offset for playlist ${playlistId}. Total items: ${pageData.total}, current offset: ${offset}. Breaking loop.`,
+        );
+        hasMore = false;
+      }
+      if (
+        !pageData.items ||
+        (pageData.items.length === 0 && pageData.next)
+      ) {
+        console.warn(
+          `[Spotify Tracks] No items returned but 'next' URL present for playlist ${playlistId}. Offset: ${offset}. Breaking loop.`,
+        );
+        hasMore = false;
+      }
+    }
+    res.json(allTracks);
+  })
 );
 
 // Playlist Routes
-app.get("/", (req: Request, res: Response) => {
+app.get("/", ((req, res) => {
   res.send("Hello from the API!");
-});
-
-// Middleware for async error handling
-const asyncHandler =
-  (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) =>
-  (req: Request, res: Response, next: NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
+}) as RequestHandler);
 
 // Comment Routes
 // Create a new comment on a track in a playlist
@@ -685,7 +508,6 @@ app.post(
     }
     const { playlist_id, track_uri, timestamp_ms, comment_text } = req.body;
     const user_id = (req.user as any).id;
-
     if (
       !playlist_id ||
       !track_uri ||
@@ -697,13 +519,10 @@ app.post(
           "Missing required fields: playlist_id, track_uri, timestamp_ms, comment_text.",
       });
     }
-
-    // Optional: Validate that the playlist exists
     const playlist = await db("playlists").where({ id: playlist_id }).first();
     if (!playlist) {
       return res.status(404).json({ message: "Playlist not found." });
     }
-
     const newComment = {
       playlist_id,
       user_id,
@@ -711,16 +530,14 @@ app.post(
       timestamp_ms,
       comment_text,
     };
-
     const [newCommentId] = await db("playlist_track_comments").insert(
       newComment,
     );
     const createdComment = await db("playlist_track_comments")
       .where({ id: newCommentId })
       .first();
-
     res.status(201).json(createdComment);
-  }),
+  })
 );
 
 // Get all comments for a specific playlist
@@ -728,19 +545,15 @@ app.get(
   "/playlists/:playlistId/comments",
   asyncHandler(async (req: Request, res: Response) => {
     const { playlistId } = req.params;
-
-    // Optional: Validate that the playlist exists
     const playlist = await db("playlists").where({ id: playlistId }).first();
     if (!playlist) {
       return res.status(404).json({ message: "Playlist not found." });
     }
-
     const comments = await db("playlist_track_comments")
       .where({ playlist_id: playlistId })
-      .orderBy("created_at", "asc"); // Or order by track_uri, then timestamp_ms
-
+      .orderBy("created_at", "asc");
     res.json(comments);
-  }),
+  })
 );
 
 // Augment Express's User type
@@ -754,7 +567,7 @@ declare global {
 }
 
 // New endpoint for saving recordings
-app.post("/api/recordings", isAuthenticated, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+app.post("/api/recordings", isAuthenticated, async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   try {
     if (!req.user || !req.user.id) {
       res.status(401).json({ message: "User not authenticated or user ID missing." });
@@ -829,7 +642,7 @@ app.post("/api/recordings", isAuthenticated, async (req: Request, res: Response,
 });
 
 // New endpoint for fetching recordings for the authenticated user
-app.get("/api/recordings", isAuthenticated, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+app.get("/api/recordings", isAuthenticated, async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   try {
     if (!req.user || !req.user.id) {
       res.status(401).json({ message: "User not authenticated or user ID missing." });
@@ -864,155 +677,155 @@ app.get("/api/recordings", isAuthenticated, async (req: Request, res: Response, 
 app.put(
   "/spotify/play",
   isAuthenticated,
-  async (req: Request, res: Response, next: NextFunction) => {
-    (async () => {
-      console.log(
-        "[API /spotify/play] Received request body:",
-        JSON.stringify(req.body, null, 2),
-      );
-      if (!req.isAuthenticated() || !req.user) {
-        // Session presence checked by getRefreshedUserSpotifyToken
-        return res.status(401).json({ message: "User not authenticated." });
-      }
-
-      const userSpotifyToken = await getRefreshedUserSpotifyToken(req);
-
-      if (!userSpotifyToken) {
-        // If token refresh failed or no initial token, user might need to re-authenticate fully.
-        return res.status(401).json({
-          message:
-            "Spotify access token missing or failed to refresh. Please re-login.",
-        });
-      }
-
-      const { device_id, context_uri, uris, offset, position_ms } = req.body;
-      console.log(
-        `[API /spotify/play] Extracted userSpotifyToken (first 20 chars): ${userSpotifyToken?.substring(0, 20)}...`,
-      );
-
-      if (!device_id) {
-        return res.status(400).json({ message: "Device ID is required." });
-      }
-
-      // Ensure that either context_uri or uris is provided, but not if both are empty (which is already handled by Spotify)
-      // The main issue is sending both if both are present.
-
-      const spotifyPlayBody: any = {};
-      if (offset) spotifyPlayBody.offset = offset;
-      if (typeof position_ms === "number")
-        spotifyPlayBody.position_ms = position_ms;
-
-      if (context_uri) {
-        // Prioritize context_uri if provided
-        spotifyPlayBody.context_uri = context_uri;
-      } else if (uris && uris.length > 0) {
-        spotifyPlayBody.uris = uris;
-      } else {
-        // This case should ideally be caught by the frontend or earlier validation,
-        // but as a fallback, Spotify will also return an error.
-        return res.status(400).json({
-          message:
-            "Either context_uri or uris must be provided to start playback.",
-        });
-      }
-
-      const spotifyApiUrl = `https://api.spotify.com/v1/me/player/play?device_id=${device_id}`;
-      console.log(
-        `[API /spotify/play] Sending request to Spotify: ${spotifyApiUrl} with body:`,
-        JSON.stringify(spotifyPlayBody),
-      );
-
-      const spotifyResponse = await fetch(spotifyApiUrl, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${userSpotifyToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(spotifyPlayBody),
-      });
-
-      if (!spotifyResponse.ok) {
-        const errorBody = await spotifyResponse.text();
-        console.error(
-          "[API /spotify/play] Spotify API error:",
-          spotifyResponse.status,
-          errorBody,
-        );
-        try {
-          const parsedError = JSON.parse(errorBody);
-          return res.status(spotifyResponse.status).json(parsedError);
-        } catch (e) {
-          return res
-            .status(spotifyResponse.status)
-            .json({ message: errorBody || "Spotify API returned an error." });
+  asyncHandler(async (req: express.Request, res: express.Response) => {
+    console.log(
+      "[API /spotify/play] Received request:",
+      {
+        body: req.body,
+        isAuthenticated: req.isAuthenticated(),
+        hasUser: !!req.user,
+        session: {
+          hasAccessToken: !!req.session?.spotifyAccessToken,
+          hasRefreshToken: !!req.session?.spotifyRefreshToken,
         }
       }
+    );
 
-      console.log(
-        "[API /spotify/play] Spotify API call successful, status:",
-        spotifyResponse.status,
-      );
-      return res
-        .status(spotifyResponse.status)
-        .json({ message: "Playback command sent successfully." });
-    })().catch((err) => {
-      console.error("[API /spotify/play] Unhandled error in async block:", err);
-      next(err);
+    if (!req.isAuthenticated() || !req.user) {
+      console.error("[API /spotify/play] User not authenticated");
+      return res.status(401).json({ message: "User not authenticated." });
+    }
+
+    const userSpotifyToken = await getRefreshedUserSpotifyToken(req);
+    console.log("[API /spotify/play] Token refresh result:", {
+      hasToken: !!userSpotifyToken,
+      tokenLength: userSpotifyToken?.length
     });
-  },
+
+    if (!userSpotifyToken) {
+      console.error("[API /spotify/play] No valid Spotify token available");
+      return res.status(401).json({
+        message: "Spotify access token missing or failed to refresh. Please re-login.",
+      });
+    }
+
+    const { device_id, context_uri, uris, offset, position_ms } = req.body;
+    console.log("[API /spotify/play] Playback request details:", {
+      device_id,
+      context_uri,
+      uris,
+      offset,
+      position_ms
+    });
+
+    if (!device_id) {
+      console.error("[API /spotify/play] Missing device_id in request");
+      return res.status(400).json({ message: "Device ID is required." });
+    }
+
+    const spotifyPlayBody: any = {};
+    if (offset) spotifyPlayBody.offset = offset;
+    if (typeof position_ms === "number") spotifyPlayBody.position_ms = position_ms;
+
+    if (context_uri) {
+      spotifyPlayBody.context_uri = context_uri;
+    } else if (uris && uris.length > 0) {
+      spotifyPlayBody.uris = uris;
+    } else {
+      console.error("[API /spotify/play] Missing playback context");
+      return res.status(400).json({
+        message: "Either context_uri or uris must be provided to start playback.",
+      });
+    }
+
+    const spotifyApiUrl = `https://api.spotify.com/v1/me/player/play?device_id=${device_id}`;
+    console.log("[API /spotify/play] Sending request to Spotify:", {
+      url: spotifyApiUrl,
+      body: spotifyPlayBody
+    });
+
+    const spotifyResponse = await fetch(spotifyApiUrl, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${userSpotifyToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(spotifyPlayBody),
+    });
+
+    if (!spotifyResponse.ok) {
+      const errorBody = await spotifyResponse.text();
+      console.error(
+        "[API /spotify/play] Spotify API error:",
+        {
+          status: spotifyResponse.status,
+          statusText: spotifyResponse.statusText,
+          error: errorBody
+        }
+      );
+      try {
+        const parsedError = JSON.parse(errorBody);
+        return res.status(spotifyResponse.status).json(parsedError);
+      } catch (e) {
+        return res
+          .status(spotifyResponse.status)
+          .json({ message: errorBody || "Spotify API returned an error." });
+      }
+    }
+
+    console.log("[API /spotify/play] Spotify API call successful");
+    return res
+      .status(spotifyResponse.status)
+      .json({ message: "Playback command sent successfully." });
+  })
 );
 
 // DEV LOGIN ROUTE - Only active in development
 if (process.env.NODE_ENV === "development") {
   app.post(
     "/auth/dev-login",
-    (req: Request, res: Response, next: NextFunction) => {
-      (async () => {
-        const { userId } = req.body;
-        if (!userId) {
-          return res
-            .status(400)
-            .json({ message: "Developer userId (spotify_id) is required." });
-        }
-        let user = await db("users").where({ spotify_id: userId }).first();
-        if (!user) {
-          console.log(`Creating new dev user with spotify_id: ${userId}`);
-          const [newUserIdFromDb] = await db("users").insert({
-            spotify_id: userId,
-            display_name: `Dev User (${userId})`,
-          });
-          user = await db("users").where({ id: newUserIdFromDb }).first();
-        }
-        if (!user) {
-          return res
-            .status(500)
-            .json({ message: "Failed to create or find dev user." });
-        }
-        req.login(user, (err) => {
-          if (err) {
-            console.error("Error during dev req.login:", err);
-            return next(err);
-          }
-          console.log(
-            `Developer user ${user.display_name} logged in successfully via dev-login.`,
-          );
-          return res.status(200).json({ user: req.user });
+    asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+      const { userId } = req.body;
+      if (!userId) {
+        return res
+          .status(400)
+          .json({ message: "Developer userId (spotify_id) is required." });
+      }
+      let user = await db("users").where({ spotify_id: userId }).first();
+      if (!user) {
+        console.log(`Creating new dev user with spotify_id: ${userId}`);
+        const [newUserIdFromDb] = await db("users").insert({
+          spotify_id: userId,
+          display_name: `Dev User (${userId})`,
         });
-      })().catch((err) => {
-        console.error("Unhandled error in /auth/dev-login async block:", err);
-        next(err);
+        user = await db("users").where({ id: newUserIdFromDb }).first();
+      }
+      if (!user) {
+        return res
+          .status(500)
+          .json({ message: "Failed to create or find dev user." });
+      }
+      req.login(user, (err) => {
+        if (err) {
+          console.error("Error during dev req.login:", err);
+          return next(err);
+        }
+        console.log(
+          `Developer user ${user.display_name} logged in successfully via dev-login.`,
+        );
+        return res.status(200).json({ user: req.user });
       });
-    },
+    })
   );
 }
 
-// Centralized error handling middleware (example, ensure this is at the end)
+// Centralized error handling middleware
 app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
-  console.error("[API] Unhandled Error:", (err instanceof Error) ? err.message : err);
-  if (err instanceof Error && err.name === 'UnauthorizedError') { // Example: JWT auth error
+  console.error("[API] Unhandled Error:", err instanceof Error ? err.message : err);
+  if (err instanceof Error && err.name === 'UnauthorizedError') {
     res.status(401).json({ message: "Invalid token" });
   } else if (res.headersSent) {
-    return next(err); // Delegate to default Express error handler if headers already sent
+    return next(err);
   } else {
     res.status(500).json({ message: "Internal Server Error" });
   }
@@ -1031,7 +844,7 @@ app.get("/top-tracks", async (req, res) => {
 });
 
 // New endpoint for the current user's playlists
-app.get("/api/me/playlists", isAuthenticated, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+app.get("/api/me/playlists", isAuthenticated, async (req: express.Request, res: express.Response, next: express.NextFunction): Promise<void> => {
   try {
     if (!req.user || !req.user.id) {
       res.status(401).json({ message: "User not authenticated or user ID missing." });
