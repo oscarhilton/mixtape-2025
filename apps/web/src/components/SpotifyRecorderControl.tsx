@@ -20,6 +20,7 @@ export default function SpotifyRecorderControl() {
   const [recordedData, setRecordedData] = useState<RecordingSegment[]>([]);
   const [componentError, setComponentError] = useState<string | null>(null);
   const [isPlayingBack, setIsPlayingBack] = useState(false);
+  const [recordingName, setRecordingName] = useState("");
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -145,6 +146,45 @@ export default function SpotifyRecorderControl() {
     } catch (e) {
       console.error('[SpotifyRecorderControl] Failed to save recording to local storage:', e);
     }
+
+    // Save to database via API
+    if (data && data.length > 0) {
+      saveRecordingToDb(data, recordingName);
+    }
+  };
+
+  const saveRecordingToDb = async (segments: RecordingSegment[], name?: string) => {
+    if (!user) {
+      console.error('[SpotifyRecorderControl] User not available, cannot save recording to DB.');
+      setComponentError('User not found. Cannot save recording.');
+      return;
+    }
+    console.log('[SpotifyRecorderControl] Attempting to save recording to DB:', segments);
+    try {
+      const response = await fetch('/api/recordings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ segments: segments, userId: user.id, name: name }), // Send segments, userId, and name
+        credentials: 'include', // Important for sending session cookies
+      });
+
+      if (!response.ok) {
+        const errorResult = await response.json().catch(() => ({ message: 'Failed to save recording. Server error.' }));
+        console.error('[SpotifyRecorderControl] Error saving recording to DB:', errorResult);
+        setComponentError(errorResult.message || 'Failed to save recording.');
+        return;
+      }
+
+      const result = await response.json();
+      console.log('[SpotifyRecorderControl] Recording saved to DB successfully:', result);
+      // Optionally, provide user feedback about successful save
+      // e.g., setComponentError('Recording saved successfully!'); (use a different state for success messages)
+    } catch (error) {
+      console.error('[SpotifyRecorderControl] Network or unexpected error saving recording to DB:', error);
+      setComponentError('Network error. Failed to save recording.');
+    }
   };
 
   const handlePlayRecording = async () => {
@@ -216,6 +256,20 @@ export default function SpotifyRecorderControl() {
           Player Active (Device: {contextDeviceId.substring(0,10)}...) {isRecorderFeatureReady ? "- Recorder Ready" : <span className="text-yellow-400">- Recorder Initializing...</span>}
         </p>
       }
+      
+      {!isRecording && !isPlaying && (
+         <div className="my-2">
+          <label htmlFor="recordingName" className="block text-sm font-medium text-gray-300 mb-1">Recording Name (Optional):</label>
+          <input 
+            type="text"
+            id="recordingName"
+            value={recordingName}
+            onChange={(e) => setRecordingName(e.target.value)}
+            placeholder={`My Awesome Mix - ${new Date().toLocaleDateString()}`}
+            className="w-full p-2 rounded bg-gray-700 border border-gray-600 focus:ring-sky-500 focus:border-sky-500 text-white shadow-sm"
+          />
+        </div>
+      )}
       
       <div className="flex flex-wrap gap-2">
         <button 

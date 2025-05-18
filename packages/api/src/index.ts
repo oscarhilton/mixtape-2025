@@ -12,6 +12,8 @@ import {
 import knexfile from "../knexfile"; // Using knexfile.js which is CommonJS
 import fetch from "node-fetch"; // Added for Spotify API calls
 import { URLSearchParams } from "url"; // Added for token request
+import playlistRoutes from "./routes/playlistRoutes";
+import { isAuthenticated } from "./middleware/authMiddleware"; // Assuming you have this
 
 dotenv.config();
 
@@ -351,13 +353,16 @@ app.use(
 );
 app.use(express.json());
 
+// Mount playlist routes
+app.use('/api/playlists', playlistRoutes);
+
 // Middleware to check if user is authenticated
-const isAuthenticated = (req: any, res: any, next: NextFunction) => {
-  if (req.isAuthenticated()) {
-    return next();
-  }
-  res.status(401).json({ message: "User not authenticated." });
-};
+// const isAuthenticated = (req: any, res: any, next: NextFunction) => { // Remove this inline definition
+//   if (req.isAuthenticated()) {
+//     return next();
+//   }
+//   res.status(401).json({ message: "User not authenticated." });
+// };
 
 // Auth Routes
 app.get("/auth/spotify", passport.authenticate("spotify"));
@@ -670,112 +675,6 @@ const asyncHandler =
     Promise.resolve(fn(req, res, next)).catch(next);
   };
 
-// Get all playlists
-app.get(
-  "/playlists",
-  asyncHandler(async (req: Request, res: Response) => {
-    const playlists = await db("playlists").select("*");
-    res.json(playlists);
-  }),
-);
-
-// Create a new playlist
-app.post(
-  "/playlists",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { name, spotify_playlist_id, description, latitude, longitude } =
-      req.body;
-    if (!name || !spotify_playlist_id) {
-      return res.status(400).json({
-        message: "Missing required fields: name and spotify_playlist_id",
-      });
-    }
-    // if (!latitude || !longitude) {
-    //   return res
-    //     .status(400)
-    //     .json({ message: "Missing required fields: latitude and longitude" });
-    // }
-    try {
-      const [newPlaylistId] = await db("playlists").insert({
-        name,
-        spotify_playlist_id,
-        description,
-        // latitude,
-        // longitude,
-      });
-      const newPlaylist = await db("playlists")
-        .where({ id: newPlaylistId })
-        .first();
-      res.status(201).json(newPlaylist);
-    } catch (error: unknown) {
-      console.error("Error creating playlist:", error);
-      res.status(500).json({ message: "Failed to create playlist" });
-    }
-  }),
-);
-
-// Get a single playlist by ID
-app.get(
-  "/playlists/:id",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const playlist = await db("playlists").where({ id }).first();
-    if (playlist) {
-      res.json(playlist);
-    } else {
-      res.status(404).json({ message: "Playlist not found" });
-    }
-  }),
-);
-
-// Update a playlist (e.g., description)
-app.put(
-  "/playlists/:id",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const { name, description } = req.body;
-    const updatedCount = await db("playlists")
-      .where({ id })
-      .update({ name, description, updated_at: db.fn.now() });
-    if (updatedCount > 0) {
-      const updatedPlaylist = await db("playlists").where({ id }).first();
-      res.json(updatedPlaylist);
-    } else {
-      res.status(404).json({ message: "Playlist not found" });
-    }
-  }),
-);
-
-// Increment vote for a playlist
-app.post(
-  "/playlists/:id/vote",
-  asyncHandler(async (req: Request, res: Response) => {
-    const { id } = req.params;
-    const playlist = await db("playlists").where({ id }).first();
-    if (!playlist) {
-      return res.status(404).json({ message: "Playlist not found" });
-    }
-    await db("playlists").where({ id }).increment("votes", 1);
-    const updatedPlaylist = await db("playlists").where({ id }).first();
-    res.json(updatedPlaylist);
-  }),
-);
-
-// Delete a playlist
-app.delete(
-  "/playlists/:id",
-  asyncHandler(async (req: Request, res: Response) => {
-    // Add authentication check: if (!req.isAuthenticated()) { return res.status(401).send('Unauthorized'); }
-    const { id } = req.params;
-    const deletedCount = await db("playlists").where({ id }).del();
-    if (deletedCount > 0) {
-      res.status(200).json({ message: "Playlist deleted successfully" });
-    } else {
-      res.status(404).json({ message: "Playlist not found" });
-    }
-  }),
-);
-
 // Comment Routes
 // Create a new comment on a track in a playlist
 app.post(
@@ -843,6 +742,123 @@ app.get(
     res.json(comments);
   }),
 );
+
+// Augment Express's User type
+declare global {
+  namespace Express {
+    export interface User {
+      id?: string; // Or number, depending on your DB user ID type
+      // Add any other properties your user object will have from Passport
+    }
+  }
+}
+
+// New endpoint for saving recordings
+app.post("/api/recordings", isAuthenticated, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || !req.user.id) {
+      res.status(401).json({ message: "User not authenticated or user ID missing." });
+      return;
+    }
+    const userId = req.user.id;
+    const { segments, name: recordingName } = req.body; // Allow an optional name for the recording
+
+    if (!segments || !Array.isArray(segments) || segments.length === 0) {
+      res.status(400).json({ message: "Segments data is missing or invalid." });
+      return;
+    }
+
+    console.log(`[API /api/recordings] Received ${segments.length} segments for user ID: ${userId}. Name: ${recordingName || 'Untitled'}`);
+    // console.log("[API /api/recordings] Segments data:", JSON.stringify(segments, null, 2)); // Can be very verbose
+
+    // Database saving logic with Knex
+    const newRecordingId = await db.transaction(async (trx) => {
+      const insertResults = await trx("recordings")
+        .insert({
+          user_id: userId,
+          name: recordingName || `Recording ${new Date().toISOString()}`, // Default name
+          created_at: db.fn.now(),
+          updated_at: db.fn.now(),
+        })
+        .returning("id");
+      
+      let actualRecordingId;
+      if (insertResults && insertResults.length > 0) {
+        const firstItem = insertResults[0];
+        // Check if the first item is an object with an 'id' property (like from PostgreSQL)
+        if (typeof firstItem === 'object' && firstItem !== null && 'id' in firstItem) {
+          actualRecordingId = firstItem.id;
+        } else {
+          // Assume it's the ID directly (like from SQLite returning [123] or just 123 from .returning())
+          actualRecordingId = firstItem;
+        }
+      }
+
+      if (!actualRecordingId) {
+        console.error("[API /api/recordings] Critical: Failed to obtain recording ID after insert. Insert results:", insertResults);
+        // It's crucial to throw to trigger transaction rollback
+        throw new Error("Database operation failed: Could not retrieve ID for new recording. Please check API server logs and database integrity for the 'recordings' table.");
+      }
+
+      const segmentsToInsert = segments.map((segment: any) => ({
+        recording_id: actualRecordingId, // Use the validated ID
+        type: segment.type,
+        session_start_ms: segment.sessionStartMs,
+        duration_ms: segment.durationMs,
+        track_id: segment.trackId,
+        track_start_ms: segment.trackStartMs,
+        track_end_ms: segment.trackEndMs,
+        created_at: db.fn.now(),
+      }));
+
+      await trx("recording_segments").insert(segmentsToInsert);
+      return actualRecordingId; // Return the validated ID
+    });
+
+    res.status(201).json({
+      message: "Recording saved successfully.",
+      recordingId: newRecordingId,
+      userId: userId,
+      segmentCount: segments.length,
+    });
+
+  } catch (error) {
+    console.error("[API /api/recordings] Error processing recording:", (error instanceof Error) ? error.message : error);
+    next(error); // Pass error to the centralized error handler
+  }
+});
+
+// New endpoint for fetching recordings for the authenticated user
+app.get("/api/recordings", isAuthenticated, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || !req.user.id) {
+      res.status(401).json({ message: "User not authenticated or user ID missing." });
+      return;
+    }
+    const userId = req.user.id;
+
+    console.log(`[API /api/recordings] Fetching recordings for user ID: ${userId}`);
+
+    const recordings = await db("recordings")
+      .where({ user_id: userId })
+      .orderBy("created_at", "desc")
+      .select("*"); // Select all columns for the recording
+
+    // Optionally, for each recording, you could also fetch its segments or a segment count
+    // For simplicity here, just returning the recordings list.
+    // To include segments:
+    // const recordingsWithSegments = await Promise.all(recordings.map(async (rec) => {
+    //   const segments = await db("recording_segments").where({ recording_id: rec.id }).select("*");
+    //   return { ...rec, segments };
+    // }));
+
+    res.status(200).json(recordings);
+
+  } catch (error) {
+    console.error("[API /api/recordings GET] Error fetching recordings:", (error instanceof Error) ? error.message : error);
+    next(error);
+  }
+});
 
 // Spotify Playback Proxy (using USER's session token)
 app.put(
@@ -990,19 +1006,15 @@ if (process.env.NODE_ENV === "development") {
   );
 }
 
-// Global error handler
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  console.error(err.stack);
-  if (err.message.includes("Failed to fetch playlists")) {
-    // Example of specific error handling
-    res.status(503).json({
-      message: "Service temporarily unavailable: Could not fetch playlists.",
-      error: err.message,
-    });
+// Centralized error handling middleware (example, ensure this is at the end)
+app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
+  console.error("[API] Unhandled Error:", (err instanceof Error) ? err.message : err);
+  if (err instanceof Error && err.name === 'UnauthorizedError') { // Example: JWT auth error
+    res.status(401).json({ message: "Invalid token" });
+  } else if (res.headersSent) {
+    return next(err); // Delegate to default Express error handler if headers already sent
   } else {
-    res
-      .status(500)
-      .json({ message: "Something went wrong!", error: err.message });
+    res.status(500).json({ message: "Internal Server Error" });
   }
 });
 
@@ -1013,8 +1025,35 @@ app.get("/top-tracks", async (req, res) => {
       headers: { Authorization: `Bearer ${req.headers.authorization}` },
     });
     res.json(await response.json());
+  } catch (error: unknown) {
+    res.status(500).send((error instanceof Error) ? error.message : "An unknown error occurred");
+  }
+});
+
+// New endpoint for the current user's playlists
+app.get("/api/me/playlists", isAuthenticated, async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    if (!req.user || !req.user.id) {
+      res.status(401).json({ message: "User not authenticated or user ID missing." });
+      return;
+    }
+    const userId = req.user.id;
+
+    console.log(`[API /api/me/playlists] Fetching playlists for user ID: ${userId}`);
+
+    // Assuming your 'playlists' table has a 'user_id' column
+    // If playlists are not directly linked to users in your DB, this query needs adjustment
+    // or you might fetch based on another criterion (e.g., playlists the user has interacted with).
+    const userPlaylists = await db("playlists")
+      .where({ user_id: userId }) // Filter by the authenticated user's ID
+      .orderBy("created_at", "desc")
+      .select("*");
+
+    res.status(200).json(userPlaylists);
+
   } catch (error) {
-    res.status(500).send(error.message);
+    console.error("[API /api/me/playlists GET] Error fetching user playlists:", (error instanceof Error) ? error.message : error);
+    next(error);
   }
 });
 

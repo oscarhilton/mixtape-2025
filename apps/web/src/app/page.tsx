@@ -1,101 +1,72 @@
-import { PlaylistContent } from "@/components/PlaylistContent";
-import { logger, API_URL, ErrorBoundary, PlaylistForm } from "@repo/shared-ui";
-import SpotifyRecorderControl from "../components/SpotifyRecorderControl";
+'use client';
 
-// Removed client-side hooks: useAuth, useSpotifyPlayer, useEffect, useState
+import React, { useState, useCallback } from 'react';
+import { useAuth } from '@repo/shared-contexts';
+// import { LoginButton, LogoutButton } from "@repo/shared-ui"; // Commented out until exports are verified
+import {
+  PlaybackControls,
+  PlaylistContent,
+  UserPlaylists,
+  SpotifyRecorderControl,
+  SavedRecordingsList
+} from '@/components';
 
-interface Playlist {
-  id: number;
-  name: string;
-  spotify_playlist_id: string;
-  description?: string;
-  votes: number;
-  created_at: string;
-  updated_at: string;
-}
+// Removed Playlist and Comment interfaces as they were part of server-side fetching logic
+// Removed fetchPlaylists and fetchCommentsForPlaylist functions
 
-// Define the Comment interface based on the database table
-interface Comment {
-  id: number;
-  playlist_id: number;
-  user_id: number;
-  track_uri: string;
-  timestamp_ms: number;
-  comment_text: string;
-  created_at: string;
-  updated_at: string;
-  // Potentially join user display_name if fetched from backend, or handle on client
-}
+export default function Web() {
+  const { user, isLoading } = useAuth();
+  const [activeDbPlaylistId, setActiveDbPlaylistId] = useState<number | null>(null);
 
-async function fetchPlaylists(): Promise<Playlist[]> {
-  try {
-    const response = await fetch(`${API_URL}/playlists`, { cache: "no-store" });
-    if (!response.ok) {
-      logger.error(
-        `HTTP error! status: ${response.status}`,
-        await response.text().catch(() => "Failed to get error text"),
-      );
-      throw new Error(`Failed to fetch playlists. Status: ${response.status}`);
-    }
-    const playlists = await response.json();
-    logger.log("Fetched playlists:", playlists);
-    return playlists;
-  } catch (error) {
-    logger.error("Error in fetchPlaylists:", error);
-    return []; // Return empty array on error
+  const handlePlaylistSelected = useCallback((playlistId: number | null) => {
+    setActiveDbPlaylistId(playlistId);
+    // Future: Could also trigger fetching comments for this playlistId here
+    // or PlaylistContent can fetch its own comments based on activeDbPlaylistId prop.
+  }, []);
+
+  if (isLoading) {
+    return <div className="flex justify-center items-center h-screen bg-gray-900 text-white"><p>Loading session...</p></div>;
   }
-}
-
-async function fetchCommentsForPlaylist(
-  playlistId: number,
-): Promise<Comment[]> {
-  if (!playlistId) return [];
-  try {
-    const response = await fetch(
-      `${API_URL}/playlists/${playlistId}/comments`,
-      { cache: "no-store" },
-    );
-    if (!response.ok) {
-      logger.error(
-        `HTTP error fetching comments! status: ${response.status}`,
-        await response.text().catch(() => "Failed to get error text"),
-      );
-      throw new Error(
-        `Failed to fetch comments for playlist ${playlistId}. Status: ${response.status}`,
-      );
-    }
-    const comments = await response.json();
-    logger.log(`Fetched comments for playlist ${playlistId}:`, comments);
-    return comments;
-  } catch (error) {
-    logger.error(
-      `Error in fetchCommentsForPlaylist for playlist ${playlistId}:`,
-      error,
-    );
-    return [];
-  }
-}
-
-export default async function Home() {
-  const playlists = await fetchPlaylists();
-  const firstPlaylist = playlists[0];
-  const initialComments = firstPlaylist
-    ? await fetchCommentsForPlaylist(firstPlaylist.id)
-    : [];
-  const initialCurrentPlaylistId = firstPlaylist?.id ?? null;
 
   return (
-    <ErrorBoundary>
-      <main className="min-h-screen bg-spotify-dark font-sans w-full mx-auto px-4">
-        <SpotifyRecorderControl />
-        {/* <PlaylistForm /> */}
-        <PlaylistContent
-          initialPlaylists={playlists}
-          initialComments={initialComments}
-          initialCurrentPlaylistId={initialCurrentPlaylistId}
-        />
-        <span>foo</span>
-      </main>
-    </ErrorBoundary>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-gray-900 text-white p-4 md:p-8">
+      <header className="flex flex-col md:flex-row justify-between items-center mb-8 pb-4 border-b border-gray-700">
+        <h1 className="text-4xl font-bold text-sky-400 mb-4 md:mb-0">Mixtape In A Bottle</h1>
+        {user ? (
+          <div className="flex items-center space-x-4">
+            <span className="text-lg">Welcome, <span className="font-semibold text-sky-300">{user.display_name || user.spotify_id}</span>!</span>
+            {/* <LogoutButton /> */}{/* Commented out */}
+          </div>
+        ) : (
+          // <LoginButton /> // Commented out
+          <p className="text-lg">Please log in.</p> // Placeholder for LoginButton
+        )}
+      </header>
+
+      {user ? (
+        <main className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            <div className="md:col-span-4 space-y-6">
+              <UserPlaylists 
+                onPlaylistSelected={handlePlaylistSelected} 
+                activePlaylistId={activeDbPlaylistId} 
+              />
+              <SpotifyRecorderControl />
+              <SavedRecordingsList />
+            </div>
+            <div className="md:col-span-8 space-y-6">
+              <PlaylistContent activeDbPlaylistId={activeDbPlaylistId} />
+            </div>
+          </div>
+          <footer className="mt-12 pt-6 border-t border-gray-700">
+            <PlaybackControls />
+          </footer>
+        </main>
+      ) : (
+        <div className="text-center py-10">
+          <p className="text-xl text-gray-400">Please log in to create and share your mixtapes.</p>
+        </div>
+      )}
+    </div>
   );
 }
