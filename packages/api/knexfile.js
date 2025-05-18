@@ -7,7 +7,8 @@ module.exports = {
     },
     useNullAsDefault: true,
     migrations: {
-      directory: './migrations'
+      directory: './migrations',
+      extension: 'ts'
     },
     seeds: {
       directory: './seeds'
@@ -27,7 +28,8 @@ module.exports = {
       max: 10
     },
     migrations: {
-      directory: './migrations'
+      directory: './migrations',
+      extension: 'ts'
     },
     seeds: {
       directory: './seeds'

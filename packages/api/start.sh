@@ -9,7 +9,7 @@ echo "PostgreSQL is ready!"
 
 # Run migrations
 echo "Running database migrations..."
-npx knex migrate:latest
+NODE_ENV=production npx knex migrate:latest --knexfile ./knexfile.js --migrations-directory ./dist/migrations
 
 # Start the server
 echo "Starting API server..."

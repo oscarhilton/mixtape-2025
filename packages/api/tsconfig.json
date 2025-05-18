@@ -6,8 +6,11 @@
     "strict": true,
     "skipLibCheck": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "."
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "migrations/**/*.ts"
+  ],
   "exclude": ["node_modules"]
 } 

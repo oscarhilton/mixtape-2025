@@ -59,12 +59,20 @@ COPY --from=builder /app/packages/api/package*.json ./packages/api/
 COPY --from=builder /app/packages/api/dist ./packages/api/dist
 COPY --from=builder /app/packages/api/knexfile.js ./packages/api/knexfile.js
 COPY --from=builder /app/packages/api/migrations ./packages/api/migrations
-COPY --from=builder /app/node_modules ./node_modules
-COPY packages/api/start.sh ./packages/api/start.sh
-RUN chmod +x ./packages/api/start.sh
+COPY --from=builder /app/packages/api/tsconfig.json ./packages/api/tsconfig.json
 
+# Install production dependencies
 WORKDIR /app/packages/api
+RUN npm install --production
+RUN npm install -g ts-node typescript
+
+# Compile migrations
+RUN npx tsc -p tsconfig.json
+
+COPY packages/api/start.sh ./start.sh
+RUN chmod +x ./start.sh
+
 ENV NODE_ENV=production
 EXPOSE 3001
 
-CMD ["/app/packages/api/start.sh"]
+CMD ["./start.sh"]
