@@ -318,47 +318,34 @@ export const SpotifyPlayerProvider = ({
     }
 
     try {
-      const requestBody = {
-        device_id: playerState.deviceId,
-        ...(options?.contextUri && { context_uri: options.contextUri }),
-        ...(options?.uris && { uris: options.uris }),
-        ...(options?.offset && { offset: options.offset }),
-        ...(options?.position_ms && { position_ms: options.position_ms }),
-      };
-      console.log("[SpotifyPlayerProvider] Sending playback request:", JSON.stringify(requestBody, null, 2));
-
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"}/spotify/play`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          credentials: "include",
-          body: JSON.stringify(requestBody),
+      const response = await fetch("/api/spotify/play", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          device_id: playerState.deviceId,
+          ...options,
+        }),
+      });
+
+      console.log("[SpotifyPlayerProvider] Play request response:", {
+        status: response.status,
+        ok: response.ok,
+        statusText: response.statusText
+      });
 
       if (!response.ok) {
-        const errorData = await response
-          .json()
-          .catch(() => ({ message: "Failed to parse error response" }));
-        console.error(
-          "[SpotifyPlayerProvider] Playback request failed:",
-          {
-            status: response.status,
-            statusText: response.statusText,
-            error: errorData,
-          }
-        );
-        throw new Error(
-          `Playback API call failed: ${errorData.message || response.statusText}`,
-        );
+        const errorData = await response.json().catch(() => ({ message: "Failed to parse error response" }));
+        console.error("[SpotifyPlayerProvider] Play request failed:", errorData);
+        throw new Error(errorData.message || "Failed to start playback");
       }
-      console.log("[SpotifyPlayerProvider] Play command sent successfully");
+
+      const data = await response.json().catch(() => ({ message: "Failed to parse response" }));
+      console.log("[SpotifyPlayerProvider] Play request successful:", data);
     } catch (error) {
-      console.error("[SpotifyPlayerProvider] Error in play function:", error);
-      throw error; // Re-throw to allow caller to handle the error
+      console.error("[SpotifyPlayerProvider] Error during play request:", error);
+      throw error;
     }
   };
 

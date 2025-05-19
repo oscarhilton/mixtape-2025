@@ -675,7 +675,7 @@ app.get("/api/recordings", isAuthenticated, async (req: express.Request, res: ex
 
 // Spotify Playback Proxy (using USER's session token)
 app.put(
-  "/spotify/play",
+  "/api/spotify/play",
   isAuthenticated,
   asyncHandler(async (req: express.Request, res: express.Response) => {
     console.log(
@@ -709,10 +709,10 @@ app.put(
       });
     }
 
-    const { device_id, context_uri, uris, offset, position_ms } = req.body;
+    const { device_id, contextUri, uris, offset, position_ms } = req.body;
     console.log("[API /spotify/play] Playback request details:", {
       device_id,
-      context_uri,
+      contextUri,
       uris,
       offset,
       position_ms
@@ -727,8 +727,8 @@ app.put(
     if (offset) spotifyPlayBody.offset = offset;
     if (typeof position_ms === "number") spotifyPlayBody.position_ms = position_ms;
 
-    if (context_uri) {
-      spotifyPlayBody.context_uri = context_uri;
+    if (contextUri) {
+      spotifyPlayBody.context_uri = contextUri;
     } else if (uris && uris.length > 0) {
       spotifyPlayBody.uris = uris;
     } else {
@@ -755,28 +755,16 @@ app.put(
 
     if (!spotifyResponse.ok) {
       const errorBody = await spotifyResponse.text();
-      console.error(
-        "[API /spotify/play] Spotify API error:",
-        {
-          status: spotifyResponse.status,
-          statusText: spotifyResponse.statusText,
-          error: errorBody
-        }
-      );
-      try {
-        const parsedError = JSON.parse(errorBody);
-        return res.status(spotifyResponse.status).json(parsedError);
-      } catch (e) {
-        return res
-          .status(spotifyResponse.status)
-          .json({ message: errorBody || "Spotify API returned an error." });
-      }
+      console.error("[API /api/spotify/play] Spotify API error:", {
+        status: spotifyResponse.status,
+        statusText: spotifyResponse.statusText,
+        error: errorBody
+      });
+      return res.status(spotifyResponse.status).json({ message: errorBody || "Spotify API returned an error." });
     }
 
-    console.log("[API /spotify/play] Spotify API call successful");
-    return res
-      .status(spotifyResponse.status)
-      .json({ message: "Playback command sent successfully." });
+    console.log("[API /api/spotify/play] Spotify API call successful");
+    return res.status(200).json({ message: "Playback command sent successfully." });
   })
 );
 
